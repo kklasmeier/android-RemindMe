@@ -1,0 +1,13 @@
+*.iml
+.gradle/
+.idea/
+.kotlin/
+local.properties
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+app/build/
+**/__pycache__/
+*.pyc
+tools/remindme-api-key.png
