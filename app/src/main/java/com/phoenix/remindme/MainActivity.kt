@@ -187,11 +187,11 @@ private data class LocationSelection(
     val radius: Float,
 )
 
-private fun placeDraft(label: String) = ReminderDraft(
+private fun placeDraft(label: String, searchQuery: String? = null) = ReminderDraft(
     title = label,
     baseType = BaseType.LOCATION,
     triggerTime = null,
-    locationName = null,
+    locationName = searchQuery,
     locationOffsetMinutes = 0,
     isRecurring = false,
     recurrenceRule = null,
@@ -352,7 +352,7 @@ private fun RemindMeApp(
                     PlacesScreen(
                         onAddPlace = { label ->
                             pendingPlaceLabel = label
-                            pendingDraft = placeDraft(label)
+                            pendingDraft = placeDraft(label, searchQuery = label)
                             navController.navigate("location-picker")
                         },
                     )

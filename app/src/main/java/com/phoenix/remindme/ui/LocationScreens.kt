@@ -134,13 +134,13 @@ fun LocationFlowScreen(
         PackageManager.PERMISSION_GRANTED
 
     LaunchedEffect(draft.locationName, fineGranted) {
-        if (!draft.locationName.isNullOrBlank() && state.results.isEmpty()) {
-            if (fineGranted) {
-                viewModel.search(draft.locationName)
-            } else if (!requestedFineForSearch) {
-                requestedFineForSearch = true
-                fineLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
+        val query = draft.locationName?.trim().orEmpty()
+        if (query.isBlank()) return@LaunchedEffect
+        if (fineGranted) {
+            viewModel.search(query)
+        } else if (!requestedFineForSearch) {
+            requestedFineForSearch = true
+            fineLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
