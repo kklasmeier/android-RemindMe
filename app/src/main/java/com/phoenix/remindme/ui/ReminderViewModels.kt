@@ -1,7 +1,9 @@
 package com.phoenix.remindme.ui
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.phoenix.remindme.alerts.AlarmSoundService
 import com.phoenix.remindme.alerts.ReminderAlarmScheduler
 import com.phoenix.remindme.alerts.AlertPreferences
 import com.phoenix.remindme.alerts.ReminderNotificationPublisher
@@ -14,6 +16,7 @@ import com.phoenix.remindme.data.ReminderHistoryEntity
 import com.phoenix.remindme.data.ReminderRepository
 import com.phoenix.remindme.data.ReminderStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -40,6 +43,7 @@ data class DashboardUiState(
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val repository: ReminderRepository,
     private val scheduler: ReminderAlarmScheduler,
     private val notifications: ReminderNotificationPublisher,
@@ -58,6 +62,7 @@ class DashboardViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardUiState())
 
     fun complete(id: Long) {
+        AlarmSoundService.stop(context, id)
         viewModelScope.launch {
             val reminder = repository.get(id)
             val updated = repository.complete(id)
@@ -72,6 +77,7 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun snooze(id: Long, durationMinutes: Int) {
+        AlarmSoundService.stop(context, id)
         viewModelScope.launch {
             notifications.cancel(id)
             val reminder = repository.get(id)
@@ -86,6 +92,7 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun dismiss(id: Long) {
+        AlarmSoundService.stop(context, id)
         viewModelScope.launch {
             val reminder = repository.get(id)
             val updated = repository.dismiss(id)
@@ -111,6 +118,7 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun remove(id: Long) {
+        AlarmSoundService.stop(context, id)
         viewModelScope.launch {
             val reminder = repository.get(id) ?: return@launch
             scheduler.cancel(id)
@@ -161,6 +169,7 @@ data class EditReminderUiState(
     val recurrenceRule: String? = null,
     val alertFullScreen: Boolean = true,
     val alertSound: Boolean = true,
+    val alertAlarm: Boolean = false,
     val alertHeadsUp: Boolean = true,
     val alertLockScreen: Boolean = true,
 ) {
@@ -179,6 +188,7 @@ class EditReminderViewModel @Inject constructor(
         EditReminderUiState(
             alertFullScreen = defaults.fullScreen,
             alertSound = defaults.sound,
+            alertAlarm = false,
             alertHeadsUp = defaults.headsUp,
             alertLockScreen = defaults.lockScreen,
         ),
@@ -199,6 +209,7 @@ class EditReminderViewModel @Inject constructor(
             recurrenceRule = draft.recurrenceRule,
             alertFullScreen = defaults.fullScreen,
             alertSound = defaults.sound,
+            alertAlarm = draft.alertAlarm,
             alertHeadsUp = defaults.headsUp,
             alertLockScreen = defaults.lockScreen,
         )
@@ -216,6 +227,7 @@ class EditReminderViewModel @Inject constructor(
                 recurrenceRule = draft.recurrenceRule,
                 alertFullScreen = draft.alertFullScreen,
                 alertSound = draft.alertSound,
+                alertAlarm = draft.alertAlarm,
                 alertHeadsUp = draft.alertHeadsUp,
                 alertLockScreen = draft.alertLockScreen,
             )

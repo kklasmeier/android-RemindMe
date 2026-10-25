@@ -130,6 +130,7 @@ class LocationViewModel @Inject constructor(
                     recurrenceRule = draft.recurrenceRule,
                     alertFullScreen = draft.alertFullScreen,
                     alertSound = draft.alertSound,
+                    alertAlarm = draft.alertAlarm,
                     alertHeadsUp = draft.alertHeadsUp,
                     alertLockScreen = draft.alertLockScreen,
                 )

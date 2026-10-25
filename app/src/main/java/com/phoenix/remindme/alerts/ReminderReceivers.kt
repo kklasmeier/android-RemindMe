@@ -26,7 +26,12 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                repository.markTriggered(id)?.let(notifications::publish)
+                repository.markTriggered(id)?.let { reminder ->
+                    notifications.publish(reminder)
+                    if (reminder.alertAlarm) {
+                        runCatching { AlarmSoundService.start(context, reminder.id, reminder.title) }
+                    }
+                }
             } finally {
                 pendingResult.finish()
             }
@@ -48,6 +53,7 @@ class ReminderActionReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
+                runCatching { AlarmSoundService.stop(context, id) }
                 val existing = repository.get(id)
                 when (intent.action) {
                     ACTION_DONE -> {

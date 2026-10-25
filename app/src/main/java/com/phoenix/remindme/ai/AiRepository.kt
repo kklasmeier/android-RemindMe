@@ -29,6 +29,7 @@ data class ReminderDraft(
     val recurrenceRule: String?,
     val alertFullScreen: Boolean,
     val alertSound: Boolean,
+    val alertAlarm: Boolean = false,
     val alertHeadsUp: Boolean,
     val alertLockScreen: Boolean,
 )
@@ -223,6 +224,7 @@ class AiRepository @Inject constructor(
                 recurrenceRule = json.optString("recurrenceRule").takeIf { it.isNotBlank() && it != "null" },
                 alertFullScreen = json.optBoolean("alertFullScreen", alerts.fullScreen),
                 alertSound = json.optBoolean("alertSound", alerts.sound),
+                alertAlarm = false,
                 alertHeadsUp = json.optBoolean("alertHeadsUp", alerts.headsUp),
                 alertLockScreen = json.optBoolean("alertLockScreen", alerts.lockScreen),
             )
@@ -261,7 +263,9 @@ internal object NaturalLanguageSchedule {
     private val twelveHourTime =
         Regex("""\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b""", RegexOption.IGNORE_CASE)
     private val twentyFourHourTime =
-        Regex("""\bat\s+([01]?\d|2[0-3]):([0-5]\d)\b""", RegexOption.IGNORE_CASE)
+        Regex("""\bat\s+(0\d|1[3-9]|2[0-3])(?::([0-5]\d))?\b(?!\s*[ap]\.?m\.?)""", RegexOption.IGNORE_CASE)
+    private val bareHourTime =
+        Regex("""\bat\s+(\d{1,2})(?::([0-5]\d))?\b(?!\s*[ap]\.?m\.?)""", RegexOption.IGNORE_CASE)
     private val dayCodes = linkedMapOf(
         "monday" to "MO",
         "tuesday" to "TU",
@@ -278,9 +282,9 @@ internal object NaturalLanguageSchedule {
         zone: ZoneId = ZoneId.systemDefault(),
     ): ParsedSchedule? {
         val normalized = transcript.lowercase()
-        val time = parseTime(normalized) ?: return null
-        val recurrence = recurrenceRule(normalized)
         val current = now.atZone(zone)
+        val time = parseTime(normalized, current.toLocalTime()) ?: return null
+        val recurrence = recurrenceRule(normalized)
         val recurrenceDays = recurrenceDays(recurrence)
         val monthDay = ruleValue(recurrence, "BYMONTHDAY")?.toIntOrNull()
         val setPosition = ruleValue(recurrence, "BYSETPOS")?.toIntOrNull()
@@ -315,7 +319,7 @@ internal object NaturalLanguageSchedule {
         return ParsedSchedule(trigger.toInstant().toEpochMilli(), normalizedRecurrence)
     }
 
-    private fun parseTime(text: String): LocalTime? {
+    private fun parseTime(text: String, now: LocalTime): LocalTime? {
         if (Regex("""\bnoon\b""").containsMatchIn(text)) return LocalTime.NOON
         if (Regex("""\bmidnight\b""").containsMatchIn(text)) return LocalTime.MIDNIGHT
         twelveHourTime.find(text)?.let { match ->
@@ -332,8 +336,30 @@ internal object NaturalLanguageSchedule {
                 minute,
             )
         }
-        return twentyFourHourTime.find(text)?.let {
-            LocalTime.of(it.groupValues[1].toInt(), it.groupValues[2].toInt())
+        twentyFourHourTime.find(text)?.let { match ->
+            val minute = match.groupValues[2].ifBlank { "0" }.toIntOrNull() ?: return null
+            return LocalTime.of(match.groupValues[1].toInt(), minute)
+        }
+        bareHourTime.find(text)?.let { match ->
+            val hour = match.groupValues[1].toIntOrNull() ?: return null
+            val minute = match.groupValues[2].ifBlank { "0" }.toIntOrNull() ?: return null
+            if (minute !in 0..59) return null
+            return when (hour) {
+                in 13..23 -> LocalTime.of(hour, minute)
+                in 1..12 -> nextTwelveHourTime(hour, minute, now)
+                else -> null
+            }
+        }
+        return null
+    }
+
+    private fun nextTwelveHourTime(hour: Int, minute: Int, now: LocalTime): LocalTime {
+        val morning = LocalTime.of(if (hour == 12) 0 else hour, minute)
+        val evening = LocalTime.of(if (hour == 12) 12 else hour + 12, minute)
+        return when {
+            morning.isAfter(now) -> morning
+            evening.isAfter(now) -> evening
+            else -> morning
         }
     }
 

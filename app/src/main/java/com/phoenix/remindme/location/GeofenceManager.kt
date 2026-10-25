@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingRequest
 import com.google.android.gms.location.LocationServices
+import com.phoenix.remindme.alerts.AlarmSoundService
 import com.phoenix.remindme.alerts.ReminderAlarmScheduler
 import com.phoenix.remindme.alerts.ReminderNotificationPublisher
 import com.phoenix.remindme.data.BaseType
@@ -113,7 +114,12 @@ class GeofenceBroadcastReceiver : android.content.BroadcastReceiver() {
                     if (reminder.locationOffsetMinutes > 0) {
                         scheduler.scheduleLocationOffset(id, reminder.locationOffsetMinutes)
                     } else {
-                        reminders.markTriggered(id)?.let(notifications::publish)
+                        reminders.markTriggered(id)?.let { triggered ->
+                            notifications.publish(triggered)
+                            if (triggered.alertAlarm) {
+                                runCatching { AlarmSoundService.start(context, triggered.id, triggered.title) }
+                            }
+                        }
                     }
                     if (!reminder.isRecurring) {
                         geofences.remove(id)

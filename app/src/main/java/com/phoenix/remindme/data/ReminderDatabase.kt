@@ -32,6 +32,7 @@ data class ReminderEntity(
     val recurrenceRule: String? = null,
     val alertFullScreen: Boolean = true,
     val alertSound: Boolean = true,
+    val alertAlarm: Boolean = false,
     val alertHeadsUp: Boolean = true,
     val alertLockScreen: Boolean = true,
     val status: ReminderStatus = ReminderStatus.ACTIVE,
@@ -218,7 +219,7 @@ interface SavedPlaceDao {
 
 @Database(
     entities = [ReminderEntity::class, SavedPlaceEntity::class, ReminderHistoryEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(DatabaseConverters::class)

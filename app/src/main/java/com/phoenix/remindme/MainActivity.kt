@@ -18,9 +18,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +48,7 @@ import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Schedule
@@ -55,9 +58,10 @@ import androidx.compose.material.icons.filled.Upcoming
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -89,6 +93,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontStyle
@@ -197,6 +204,7 @@ private fun placeDraft(label: String, searchQuery: String? = null) = ReminderDra
     recurrenceRule = null,
     alertFullScreen = true,
     alertSound = true,
+    alertAlarm = false,
     alertHeadsUp = true,
     alertLockScreen = true,
 )
@@ -248,6 +256,22 @@ private fun RemindMeApp(
         }
     }
 
+    fun openManualReminder(fromVoice: Boolean = false) {
+        pendingDraft = null
+        pendingLocation = null
+        pendingPlaceLabel = null
+        navController.navigate("reminder-edit") {
+            if (fromVoice) popUpTo("voice-input") { inclusive = true }
+            launchSingleTop = true
+        }
+    }
+
+    fun openVoiceReminder() {
+        navController.navigate(if (apiKeys.hasKey()) "voice-input" else "api-key-setup") {
+            launchSingleTop = true
+        }
+    }
+
     LaunchedEffect(Unit) {
         when {
             needsOnboarding -> navController.navigate("api-key-setup") { launchSingleTop = true }
@@ -272,7 +296,13 @@ private fun RemindMeApp(
         Scaffold(
             containerColor = Background,
             bottomBar = {
-                if (showNav) BottomNavigation(navController)
+                if (showNav) {
+                    BottomNavigation(
+                        navController = navController,
+                        onVoice = ::openVoiceReminder,
+                        onManual = { openManualReminder() },
+                    )
+                }
             },
         ) { padding ->
             NavHost(
@@ -282,17 +312,7 @@ private fun RemindMeApp(
             ) {
                 composable(Tab.Today.route) {
                     DashboardScreen(
-                        onAdd = {
-                            navController.navigate(if (apiKeys.hasKey()) "voice-input" else "api-key-setup") {
-                                launchSingleTop = true
-                            }
-                        },
-                        onManual = {
-                            pendingDraft = null
-                            pendingLocation = null
-                            pendingPlaceLabel = null
-                            navController.navigate("reminder-edit") { launchSingleTop = true }
-                        },
+                        onManual = { openManualReminder() },
                         onOpen = { id ->
                             selectedReminderId = id
                             navController.navigate("reminder-detail")
@@ -309,6 +329,7 @@ private fun RemindMeApp(
                                 recurrenceRule = source.recurrenceRule,
                                 alertFullScreen = source.alertFullScreen,
                                 alertSound = source.alertSound,
+                                alertAlarm = source.alertAlarm,
                                 alertHeadsUp = source.alertHeadsUp,
                                 alertLockScreen = source.alertLockScreen,
                             )
@@ -459,6 +480,7 @@ private fun RemindMeApp(
                 composable("voice-input") {
                     VoiceFlowScreen(
                         onClose = ::abandonReminderCreation,
+                        onManualCreate = { openManualReminder(fromVoice = true) },
                         onEditDraft = { draft ->
                             pendingPlaceLabel = null
                             pendingDraft = draft
@@ -537,34 +559,44 @@ private fun RemindMeApp(
                 }
             }
         }
-        if (showNav) {
-            FloatingActionButton(
-                onClick = {
-                    navController.navigate(if (apiKeys.hasKey()) "voice-input" else "api-key-setup") {
-                        launchSingleTop = true
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 52.dp)
-                    .size(58.dp),
-                shape = CircleShape,
-                containerColor = Accent,
-                contentColor = Color.White,
-            ) {
-                Icon(Icons.Default.Mic, contentDescription = "Create reminder")
-            }
-        }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun BottomNavigation(navController: NavHostController) {
+private fun BottomNavigation(
+    navController: NavHostController,
+    onVoice: () -> Unit,
+    onManual: () -> Unit,
+) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val current = backStackEntry?.destination
     NavigationBar(containerColor = Color(0xFF0A0C16)) {
         tabs.forEachIndexed { index, tab ->
-            if (index == 2) Spacer(Modifier.width(64.dp))
+            if (index == 2) {
+                Box(
+                    modifier = Modifier.width(72.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(58.dp)
+                            .background(Accent, CircleShape)
+                            .combinedClickable(
+                                onClick = onVoice,
+                                onLongClick = onManual,
+                                role = Role.Button,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.Mic,
+                            contentDescription = "Create reminder. Long-press to create manually.",
+                            tint = Color.White,
+                        )
+                    }
+                }
+            }
             NavigationBarItem(
                 selected = current?.hierarchy?.any { it.route == tab.route } == true,
                 onClick = {
@@ -583,7 +615,6 @@ private fun BottomNavigation(navController: NavHostController) {
 
 @Composable
 private fun DashboardScreen(
-    onAdd: () -> Unit,
     onManual: () -> Unit,
     onOpen: (Long) -> Unit,
     onCreateAgain: (ReminderEntity) -> Unit,
@@ -607,7 +638,7 @@ private fun DashboardScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp),
+        contentPadding = PaddingValues(bottom = 72.dp),
     ) {
         item {
             Column(Modifier.padding(20.dp)) {
@@ -623,17 +654,6 @@ private fun DashboardScreen(
                     fontSize = 11.sp,
                 )
                 Spacer(Modifier.height(16.dp))
-                VoicePill(onAdd)
-                Text(
-                    "Can't talk right now? Create manually",
-                    color = Accent2,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .align(Alignment.End)
-                        .clickable(onClick = onManual)
-                        .padding(horizontal = 4.dp, vertical = 10.dp),
-                )
-                Spacer(Modifier.height(18.dp))
                 StatsStrip(state)
             }
         }
@@ -655,31 +675,6 @@ private fun DashboardScreen(
                 onOpen = onOpen,
             ) { snoozing = it }
         }
-    }
-}
-
-@Composable
-private fun VoicePill(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Accent.copy(alpha = .10f), RoundedCornerShape(40.dp))
-            .border(1.dp, Accent.copy(alpha = .28f), RoundedCornerShape(40.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .size(28.dp)
-                .background(Accent, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Default.Mic, null, Modifier.size(16.dp), tint = Color.White)
-        }
-        Spacer(Modifier.width(10.dp))
-        Text("What do you need to remember?", color = Accent, fontSize = 13.sp, modifier = Modifier.weight(1f))
-        Text("Tap to add", color = TextDim, fontSize = 11.sp)
     }
 }
 
@@ -741,7 +736,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.reminderSection(
             onOpen = onOpen,
             placeName = reminder.locationId?.let(placeNames::get),
             onSnooze = onSnooze,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 5.dp),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
         )
     }
 }
@@ -758,11 +753,12 @@ private fun ReminderCard(
     modifier: Modifier = Modifier,
 ) {
     val accent = if (reminder.baseType == BaseType.TIME) Accent else Accent2
+    var menuOpen by remember { mutableStateOf(false) }
     Card(
         modifier = modifier.fillMaxWidth().clickable { onOpen(reminder.id) },
         colors = CardDefaults.cardColors(containerColor = Glass),
         border = BorderStroke(1.dp, GlassBorder),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(14.dp),
     ) {
         Row(
             Modifier
@@ -770,33 +766,35 @@ private fun ReminderCard(
                 .drawBehind {
                     drawRect(
                         color = accent,
-                        size = Size(4.dp.toPx(), size.height),
+                        size = Size(3.dp.toPx(), size.height),
                     )
                 }
-                .padding(14.dp),
+                .padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 Modifier
-                    .size(36.dp)
-                    .background(accent.copy(alpha = .15f), RoundedCornerShape(10.dp)),
+                    .size(28.dp)
+                    .background(accent.copy(alpha = .15f), RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     if (reminder.baseType == BaseType.TIME) Icons.Default.Schedule else Icons.Default.LocationOn,
                     null,
+                    Modifier.size(16.dp),
                     tint = accent,
                 )
             }
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     reminder.title,
                     fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(5.dp))
+                Spacer(Modifier.height(2.dp))
                 Text(reminderMeta(reminder, placeName), color = accent, fontSize = 10.sp)
                 if (reminder.baseType == BaseType.TIME &&
                     (reminder.status == ReminderStatus.ACTIVE || reminder.status == ReminderStatus.SNOOZED)
@@ -819,26 +817,73 @@ private fun ReminderCard(
                 }
             }
             if (reminder.status == ReminderStatus.ACTIVE || reminder.status == ReminderStatus.SNOOZED) {
-                Column {
-                    IconButton(onClick = { onSnooze(reminder) }) {
-                        Icon(Icons.Default.Snooze, contentDescription = "Snooze", tint = Warning)
+                IconButton(
+                    onClick = { onComplete(reminder.id) },
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = "Complete", tint = Accent2)
+                }
+                Box {
+                    IconButton(
+                        onClick = { menuOpen = true },
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More actions", tint = TextDim)
                     }
-                    IconButton(onClick = { onComplete(reminder.id) }) {
-                        Icon(Icons.Default.Check, contentDescription = "Complete", tint = Accent2)
-                    }
-                    IconButton(onClick = { onRemove(reminder.id) }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Remove reminder", tint = TextDim)
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Snooze") },
+                            onClick = {
+                                menuOpen = false
+                                onSnooze(reminder)
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Snooze, contentDescription = null, tint = Warning)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete") },
+                            onClick = {
+                                menuOpen = false
+                                onRemove(reminder.id)
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Delete, contentDescription = null, tint = TextDim)
+                            },
+                        )
                     }
                 }
             } else {
-                Column {
-                    onRepeat?.let { repeat ->
-                        IconButton(onClick = { repeat(reminder) }) {
-                            Icon(Icons.Default.Replay, contentDescription = "Create again", tint = Accent2)
-                        }
+                Box {
+                    IconButton(
+                        onClick = { menuOpen = true },
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More actions", tint = TextDim)
                     }
-                    IconButton(onClick = { onRemove(reminder.id) }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Remove reminder", tint = TextDim)
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        onRepeat?.let { repeat ->
+                            DropdownMenuItem(
+                                text = { Text("Create again") },
+                                onClick = {
+                                    menuOpen = false
+                                    repeat(reminder)
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Replay, contentDescription = null, tint = Accent2)
+                                },
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("Delete") },
+                            onClick = {
+                                menuOpen = false
+                                onRemove(reminder.id)
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Delete, contentDescription = null, tint = TextDim)
+                            },
+                        )
                     }
                 }
             }
@@ -849,7 +894,7 @@ private fun ReminderCard(
 private fun reminderMeta(reminder: ReminderEntity, placeName: String? = null): String = when (reminder.baseType) {
     BaseType.LOCATION -> placeName?.let { "At $it" } ?: "Location reminder"
     BaseType.TIME -> (reminder.snoozedUntil ?: reminder.triggerTime)?.let {
-        val formatted = DateTimeFormatter.ofPattern("MMM d · h:mm a")
+        val formatted = DateTimeFormatter.ofPattern("EEE · MMM d · h:mm a")
             .format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()))
         if (reminder.status == ReminderStatus.SNOOZED) "Snoozed until $formatted" else formatted
     } ?: "No time"
@@ -857,10 +902,12 @@ private fun reminderMeta(reminder: ReminderEntity, placeName: String? = null): S
 
 private fun timeRemainingLabel(target: Long, now: Long, isSnoozed: Boolean): String {
     val remainingSeconds = ((target - now).coerceAtLeast(0L) + 999L) / 1_000L
-    val hours = remainingSeconds / 3_600
+    val days = remainingSeconds / 86_400
+    val hours = (remainingSeconds % 86_400) / 3_600
     val minutes = (remainingSeconds % 3_600) / 60
     val seconds = remainingSeconds % 60
     val duration = when {
+        days > 0 -> "${days}d ${hours}h"
         hours > 0 -> "${hours}h ${minutes}m"
         minutes > 0 -> "${minutes}m ${seconds}s"
         else -> "${seconds}s"
@@ -1672,6 +1719,8 @@ private fun PlaceholderScreen(title: String, subtitle: String) {
     }
 }
 
+private enum class ManualBuilderStep { What, Choose, Time, Location }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditReminderScreen(
@@ -1689,40 +1738,52 @@ private fun EditReminderScreen(
     }
     val state by viewModel.state
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var step by remember(initialDraft) {
         mutableStateOf(
             when {
-                initialDraft == null || initialDraft.title.isBlank() -> 0
-                initialDraft.baseType == BaseType.TIME && initialDraft.triggerTime != null -> 2
-                else -> 1
+                locationSelection != null -> ManualBuilderStep.Location
+                initialDraft?.triggerTime != null -> ManualBuilderStep.Time
+                !initialDraft?.title.isNullOrBlank() -> ManualBuilderStep.Choose
+                else -> ManualBuilderStep.What
             },
         )
     }
-    val isLocation = locationSelection != null
     LaunchedEffect(locationSelection) {
-        if (locationSelection != null) step = 2
+        if (locationSelection != null) step = ManualBuilderStep.Location
     }
+
+    fun locationDraft(searchName: String? = null) = ReminderDraft(
+        title = state.title.trim(),
+        baseType = BaseType.LOCATION,
+        triggerTime = null,
+        locationName = searchName,
+        locationOffsetMinutes = locationSelection?.offsetMinutes ?: 0,
+        isRecurring = state.isRecurring,
+        recurrenceRule = state.recurrenceRule,
+        alertFullScreen = state.alertFullScreen,
+        alertSound = state.alertSound,
+        alertAlarm = state.alertAlarm,
+        alertHeadsUp = state.alertHeadsUp,
+        alertLockScreen = state.alertLockScreen,
+    )
+
     Scaffold(
         containerColor = Background,
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        when (step) {
-                            0 -> "New Reminder"
-                            1 -> "When should I remind you?"
-                            else -> "Review Reminder"
-                        },
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
+                title = { Text("New Reminder", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(
                         onClick = {
-                            when {
-                                step > 1 -> step = 1
-                                step == 1 && initialDraft == null -> step = 0
-                                else -> onClose()
+                            when (step) {
+                                ManualBuilderStep.Time, ManualBuilderStep.Location -> {
+                                    if (step == ManualBuilderStep.Location) onClearLocation()
+                                    step = ManualBuilderStep.Choose
+                                }
+                                ManualBuilderStep.Choose -> step = ManualBuilderStep.What
+                                ManualBuilderStep.What -> onClose()
                             }
                         },
                     ) { Text("‹", fontSize = 32.sp) }
@@ -1741,10 +1802,10 @@ private fun EditReminderScreen(
                 .fillMaxSize()
                 .padding(padding),
             contentPadding = PaddingValues(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            if (step == 0) item {
-                Text("WHAT DO YOU NEED TO DO?", color = TextDim, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            item {
+                Text("WHAT", color = TextDim, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
                 OutlinedTextField(
                     value = state.title,
@@ -1760,58 +1821,56 @@ private fun EditReminderScreen(
                     },
                     singleLine = true,
                 )
-                Button(
-                    onClick = { step = if (isLocation) 2 else 1 },
-                    enabled = state.title.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                ) { Text("Continue") }
+                if (step == ManualBuilderStep.What) {
+                    Button(
+                        onClick = {
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                            step = ManualBuilderStep.Choose
+                        },
+                        enabled = state.title.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    ) { Text("Continue") }
+                }
             }
-            if (step == 1) item {
-                Text("TRIGGER TYPE", color = TextDim, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+
+            if (step != ManualBuilderStep.What) item {
+                Text("REMIND ME BY", color = TextDim, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (!isLocation) {
+                    val timeSelected = step == ManualBuilderStep.Time
+                    val locationSelected = step == ManualBuilderStep.Location
+                    if (timeSelected) {
                         FilledTonalButton(onClick = {}, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Schedule, null)
                             Spacer(Modifier.width(6.dp))
                             Text("Time")
-                        }
-                    } else {
-                        OutlinedButton(
-                            onClick = { onClearLocation() },
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Icon(Icons.Default.Schedule, null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Time")
-                        }
-                    }
-                    if (isLocation) {
-                        FilledTonalButton(onClick = {}, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Default.LocationOn, null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Location")
                         }
                     } else {
                         OutlinedButton(
                             onClick = {
-                                onChooseLocation(
-                                    ReminderDraft(
-                                        title = state.title.trim(),
-                                        baseType = BaseType.LOCATION,
-                                        triggerTime = null,
-                                        locationName = null,
-                                        locationOffsetMinutes = 0,
-                                        isRecurring = state.isRecurring,
-                                        recurrenceRule = state.recurrenceRule,
-                                        alertFullScreen = state.alertFullScreen,
-                                        alertSound = state.alertSound,
-                                        alertHeadsUp = state.alertHeadsUp,
-                                        alertLockScreen = state.alertLockScreen,
-                                    ),
-                                )
+                                onClearLocation()
+                                if (state.triggerTime == null) {
+                                    viewModel.update { it.copy(triggerTime = reminderPresetMillis("tm-morning")) }
+                                }
+                                step = ManualBuilderStep.Time
                             },
-                            enabled = state.title.isNotBlank(),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(Icons.Default.Schedule, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Time")
+                        }
+                    }
+                    if (locationSelected) {
+                        FilledTonalButton(onClick = {}, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.LocationOn, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Location")
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { onChooseLocation(locationDraft()) },
                             modifier = Modifier.weight(1f),
                         ) {
                             Icon(Icons.Default.LocationOn, null)
@@ -1821,282 +1880,286 @@ private fun EditReminderScreen(
                     }
                 }
             }
-            if (step == 1 && !isLocation) item {
-                OutlinedButton(
-                    onClick = {
-                        val calendar = Calendar.getInstance()
-                        DatePickerDialog(
-                            context,
-                            { _, year, month, day ->
-                                TimePickerDialog(
-                                    context,
-                                    { _, hour, minute ->
-                                        calendar.set(year, month, day, hour, minute, 0)
-                                        calendar.set(Calendar.MILLISECOND, 0)
-                                        viewModel.update { it.copy(triggerTime = calendar.timeInMillis) }
-                                    },
-                                    calendar.get(Calendar.HOUR_OF_DAY),
-                                    calendar.get(Calendar.MINUTE),
-                                    false,
-                                ).show()
-                            },
-                            calendar.get(Calendar.YEAR),
-                            calendar.get(Calendar.MONTH),
-                            calendar.get(Calendar.DAY_OF_MONTH),
-                        ).show()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Default.DateRange, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        state.triggerTime?.let {
-                            DateTimeFormatter.ofPattern("EEE, MMM d · h:mm a")
-                                .format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()))
-                        } ?: "Choose date and time",
-                    )
-                }
-            }
-            if (step == 1 && isLocation) item {
-                Text("LOCATION", color = TextDim, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text(locationSelection.candidate.name, fontWeight = FontWeight.SemiBold)
-                Text(locationSelection.candidate.address, color = TextDim, fontSize = 12.sp)
-                Text(
-                    "${locationSelection.trigger.name.lowercase().replaceFirstChar(Char::uppercase)} · " +
-                        if (locationSelection.offsetMinutes == 0) "Immediately" else "${locationSelection.offsetMinutes} min after",
-                    color = TextMuted,
-                    fontSize = 12.sp,
-                )
-                OutlinedButton(
-                    onClick = {
-                        onChooseLocation(
-                            ReminderDraft(
-                                title = state.title.trim(),
-                                baseType = BaseType.LOCATION,
-                                triggerTime = null,
-                                locationName = locationSelection.candidate.name,
-                                locationOffsetMinutes = locationSelection.offsetMinutes,
-                                isRecurring = state.isRecurring,
-                                recurrenceRule = state.recurrenceRule,
-                                alertFullScreen = state.alertFullScreen,
-                                alertSound = state.alertSound,
-                                alertHeadsUp = state.alertHeadsUp,
-                                alertLockScreen = state.alertLockScreen,
-                            ),
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Change location") }
-            }
-            if (step == 1 && !isLocation) item {
-                SettingToggle(
-                    "Repeat",
-                    "Schedule this reminder again.",
-                    checked = state.isRecurring,
-                    onCheckedChange = { enabled ->
-                        viewModel.update {
-                            it.copy(
-                                isRecurring = enabled,
-                                recurrenceRule = if (enabled) it.recurrenceRule ?: "FREQ=DAILY" else null,
-                            )
+
+            if (step == ManualBuilderStep.Time) {
+                item {
+                    Text("WHEN", color = TextDim, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            WhenChip("Later today", Modifier.weight(1f)) {
+                                viewModel.update { it.copy(triggerTime = reminderPresetMillis("later")) }
+                            }
+                            WhenChip("Tomorrow morning", Modifier.weight(1f)) {
+                                viewModel.update { it.copy(triggerTime = reminderPresetMillis("tm-morning")) }
+                            }
                         }
-                    },
-                )
-                if (state.isRecurring) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Recurrence.presets.entries.chunked(3).forEach { choices ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            WhenChip("Tomorrow evening", Modifier.weight(1f)) {
+                                viewModel.update { it.copy(triggerTime = reminderPresetMillis("tm-evening")) }
+                            }
+                            WhenChip("Pick date & time", Modifier.weight(1f)) {
+                                val calendar = Calendar.getInstance().apply {
+                                    state.triggerTime?.let { timeInMillis = it }
+                                }
+                                DatePickerDialog(
+                                    context,
+                                    { _, year, month, day ->
+                                        TimePickerDialog(
+                                            context,
+                                            { _, hour, minute ->
+                                                calendar.set(year, month, day, hour, minute, 0)
+                                                calendar.set(Calendar.MILLISECOND, 0)
+                                                viewModel.update { it.copy(triggerTime = calendar.timeInMillis) }
+                                            },
+                                            calendar.get(Calendar.HOUR_OF_DAY),
+                                            calendar.get(Calendar.MINUTE),
+                                            false,
+                                        ).show()
+                                    },
+                                    calendar.get(Calendar.YEAR),
+                                    calendar.get(Calendar.MONTH),
+                                    calendar.get(Calendar.DAY_OF_MONTH),
+                                ).show()
+                            }
+                        }
+                    }
+                    state.triggerTime?.let { time ->
+                        Text(
+                            DateTimeFormatter.ofPattern("EEE · MMM d · h:mm a")
+                                .format(Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault())),
+                            color = Accent,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(top = 10.dp),
+                        )
+                    }
+                }
+                item {
+                    SettingToggle(
+                        "Repeat",
+                        "Schedule this reminder again.",
+                        checked = state.isRecurring,
+                        onCheckedChange = { enabled ->
+                            viewModel.update {
+                                it.copy(
+                                    isRecurring = enabled,
+                                    recurrenceRule = if (enabled) it.recurrenceRule ?: "FREQ=DAILY" else null,
+                                )
+                            }
+                        },
+                    )
+                    if (state.isRecurring) {
+                        Spacer(Modifier.height(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Recurrence.presets.entries.chunked(3).forEach { choices ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    choices.forEach { (label, rule) ->
+                                        val selected = state.recurrenceRule == rule ||
+                                            (label == "Monthly" && state.recurrenceRule?.startsWith("FREQ=MONTHLY") == true)
+                                        DefaultChoiceButton(
+                                            label = label,
+                                            selected = selected,
+                                            onClick = {
+                                                viewModel.update {
+                                                    val selectedRule = if (rule == "FREQ=MONTHLY") {
+                                                        val day = it.triggerTime
+                                                            ?.let { time ->
+                                                                Instant.ofEpochMilli(time)
+                                                                    .atZone(ZoneId.systemDefault()).dayOfMonth
+                                                            }
+                                                            ?: 1
+                                                        "FREQ=MONTHLY;BYMONTHDAY=$day"
+                                                    } else {
+                                                        rule
+                                                    }
+                                                    it.copy(recurrenceRule = selectedRule)
+                                                }
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text("Repeat on days", color = TextDim, fontSize = 10.sp)
+                        listOf(
+                            listOf("M" to "MO", "T" to "TU", "W" to "WE", "T" to "TH"),
+                            listOf("F" to "FR", "S" to "SA", "S" to "SU"),
+                        ).forEach { days ->
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                choices.forEach { (label, rule) ->
-                                    val selected = state.recurrenceRule == rule ||
-                                        (label == "Monthly" && state.recurrenceRule?.startsWith("FREQ=MONTHLY") == true)
+                                days.forEach { (label, code) ->
                                     DefaultChoiceButton(
                                         label = label,
-                                        selected = selected,
+                                        selected = recurrenceHasDay(state.recurrenceRule, code),
                                         onClick = {
                                             viewModel.update {
-                                                val selectedRule = if (rule == "FREQ=MONTHLY") {
-                                                    val day = it.triggerTime
-                                                        ?.let { time ->
-                                                            Instant.ofEpochMilli(time)
-                                                                .atZone(ZoneId.systemDefault()).dayOfMonth
-                                                        }
-                                                        ?: 1
-                                                    "FREQ=MONTHLY;BYMONTHDAY=$day"
-                                                } else {
-                                                    rule
-                                                }
-                                                it.copy(recurrenceRule = selectedRule)
+                                                it.copy(recurrenceRule = toggleRecurrenceDay(it.recurrenceRule, code))
                                             }
                                         },
                                     )
                                 }
                             }
                         }
-                    }
-                    Text("Repeat on days", color = TextDim, fontSize = 10.sp)
-                    listOf(
-                        listOf("M" to "MO", "T" to "TU", "W" to "WE", "T" to "TH"),
-                        listOf("F" to "FR", "S" to "SA", "S" to "SU"),
-                    ).forEach { days ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            days.forEach { (label, code) ->
-                                DefaultChoiceButton(
-                                    label = label,
-                                    selected = recurrenceHasDay(state.recurrenceRule, code),
-                                    onClick = {
-                                        viewModel.update {
-                                            it.copy(recurrenceRule = toggleRecurrenceDay(it.recurrenceRule, code))
-                                        }
-                                    },
+                        if (state.recurrenceRule?.startsWith("FREQ=MONTHLY") == true) {
+                            var monthlyDay by remember(state.triggerTime) {
+                                mutableStateOf(
+                                    recurrenceValue(state.recurrenceRule, "BYMONTHDAY")
+                                        ?: state.triggerTime?.let {
+                                            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).dayOfMonth.toString()
+                                        }.orEmpty(),
                                 )
                             }
-                        }
-                    }
-                    if (state.recurrenceRule?.startsWith("FREQ=MONTHLY") == true) {
-                        var monthlyDay by remember(state.triggerTime) {
-                            mutableStateOf(
-                                recurrenceValue(state.recurrenceRule, "BYMONTHDAY")
-                                    ?: state.triggerTime?.let {
-                                        Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).dayOfMonth.toString()
-                                    }.orEmpty(),
-                            )
-                        }
-                        OutlinedTextField(
-                            value = monthlyDay,
-                            onValueChange = { value ->
-                                if (value.length <= 2 && value.all(Char::isDigit)) {
-                                    monthlyDay = value
-                                    value.toIntOrNull()?.takeIf { it in 1..31 }?.let { day ->
-                                        viewModel.update {
-                                            it.copy(recurrenceRule = "FREQ=MONTHLY;BYMONTHDAY=$day")
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = monthlyDay,
+                                onValueChange = { value ->
+                                    if (value.length <= 2 && value.all(Char::isDigit)) {
+                                        monthlyDay = value
+                                        value.toIntOrNull()?.takeIf { it in 1..31 }?.let { day ->
+                                            viewModel.update {
+                                                it.copy(recurrenceRule = "FREQ=MONTHLY;BYMONTHDAY=$day")
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Day of month (1–31)") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                        )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Day of month (1–31)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                            )
+                        }
                     }
                 }
+                item {
+                    SettingToggle(
+                        title = "Alarm until acknowledged",
+                        subtitle = "Loops until Done, Snooze, or Dismiss.",
+                        checked = state.alertAlarm,
+                        onCheckedChange = { enabled ->
+                            viewModel.update { it.copy(alertAlarm = enabled) }
+                        },
+                    )
+                }
+                item {
+                    Button(
+                        onClick = { viewModel.save(onSaved) },
+                        enabled = state.canSave,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    ) { Text("Save reminder") }
+                }
             }
-            if (step == 1) item {
-                Button(
-                    onClick = { step = 2 },
-                    enabled = state.title.isNotBlank() && (isLocation || state.triggerTime != null),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Review reminder") }
-            }
-            if (step == 2) item {
-                Text("Check everything before saving.", color = TextMuted, fontSize = 13.sp)
-            }
-            if (step == 2) item {
-                ReviewSection(
-                    label = "REMINDER",
-                    title = state.title,
-                    detail = "What you need to remember",
-                    action = "Edit",
-                    onAction = { step = 0 },
-                )
-            }
-            if (step == 2 && !isLocation) item {
-                ReviewSection(
-                    label = "WHEN",
-                    title = "At a time",
-                    detail = state.triggerTime?.let {
-                        DateTimeFormatter.ofPattern("EEEE, MMMM d 'at' h:mm a")
-                            .format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()))
-                    }.orEmpty(),
-                    action = "Change",
-                    onAction = { step = 1 },
-                )
-            }
-            if (step == 2 && isLocation && state.isRecurring) item {
-                ReviewSection(
-                    label = "REPEAT",
-                    title = "Every visit",
-                    detail = "The geofence re-arms after you dismiss or complete each alert.",
-                )
-            }
-            if (step == 2 && isLocation) item {
-                ReviewSection(
-                    label = "WHEN",
-                    title = when (locationSelection.trigger) {
-                        LocationTrigger.ARRIVING -> "When I arrive"
-                        LocationTrigger.LEAVING -> "When I leave"
-                        LocationTrigger.EITHER -> "When I arrive or leave"
-                    },
-                    detail = buildString {
-                        append(locationSelection.candidate.name)
-                        append("\n")
-                        append(locationSelection.candidate.address)
-                        append("\n")
-                        append(
-                            if (locationSelection.offsetMinutes == 0) {
-                                "Alert immediately"
-                            } else {
-                                "Alert ${locationSelection.offsetMinutes} minutes after"
-                            },
-                        )
-                        append(" · ${locationSelection.radius.toInt()} m radius")
-                    },
-                    action = "Change",
-                    onAction = { step = 1 },
-                )
-            }
-            if (step == 2 && !isLocation) item {
-                ReviewSection(
-                    label = "REPEAT",
-                    title = Recurrence.label(state.recurrenceRule),
-                    detail = if (state.isRecurring) "Future occurrences are scheduled automatically." else "This reminder happens once.",
-                )
-            }
-            if (step == 2) item {
-                ReviewSection(
-                    label = "ALERT",
-                    title = listOfNotNull(
-                        "Full-screen".takeIf { state.alertFullScreen },
-                        "Sound".takeIf { state.alertSound },
-                        "Heads-up".takeIf { state.alertHeadsUp },
-                        "Lock screen".takeIf { state.alertLockScreen },
-                    ).joinToString(" · ").ifBlank { "Silent notification" },
-                    detail = "Uses your default alert style from Settings.",
-                )
-            }
-            if (step == 2) item {
-                Button(
-                    onClick = {
-                        if (isLocation) {
+
+            if (step == ManualBuilderStep.Location && locationSelection != null) {
+                item {
+                    Text("LOCATION", color = TextDim, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Glass),
+                        border = BorderStroke(1.dp, GlassBorder),
+                    ) {
+                        Column(
+                            Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(locationSelection.candidate.name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                            Text(locationSelection.candidate.address, color = TextDim, fontSize = 12.sp)
+                            Text(
+                                buildString {
+                                    append(
+                                        when (locationSelection.trigger) {
+                                            LocationTrigger.ARRIVING -> "Arriving"
+                                            LocationTrigger.LEAVING -> "Leaving"
+                                            LocationTrigger.EITHER -> "Arrive or leave"
+                                        },
+                                    )
+                                    append(" · ")
+                                    append(
+                                        if (locationSelection.offsetMinutes == 0) {
+                                            "Immediately"
+                                        } else {
+                                            "+${locationSelection.offsetMinutes} min"
+                                        },
+                                    )
+                                    append(" · ${locationSelection.radius.toInt()} m radius")
+                                },
+                                color = Accent2,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
+                    }
+                }
+                item {
+                    OutlinedButton(
+                        onClick = {
+                            onChooseLocation(locationDraft(locationSelection.candidate.name))
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Change location") }
+                }
+                item {
+                    SettingToggle(
+                        title = "Alarm until acknowledged",
+                        subtitle = "Loops until Done, Snooze, or Dismiss.",
+                        checked = state.alertAlarm,
+                        onCheckedChange = { enabled ->
+                            viewModel.update { it.copy(alertAlarm = enabled) }
+                        },
+                    )
+                }
+                item {
+                    Button(
+                        onClick = {
                             locationViewModel.saveReminder(
-                                ReminderDraft(
-                                    title = state.title.trim(),
-                                    baseType = BaseType.LOCATION,
-                                    triggerTime = null,
-                                    locationName = locationSelection.candidate.name,
-                                    locationOffsetMinutes = locationSelection.offsetMinutes,
-                                    isRecurring = state.isRecurring,
-                                    recurrenceRule = state.recurrenceRule,
-                                    alertFullScreen = state.alertFullScreen,
-                                    alertSound = state.alertSound,
-                                    alertHeadsUp = state.alertHeadsUp,
-                                    alertLockScreen = state.alertLockScreen,
-                                ),
+                                locationDraft(locationSelection.candidate.name),
                                 locationSelection.candidate,
                                 locationSelection.trigger,
                                 locationSelection.offsetMinutes,
                                 locationSelection.radius,
                                 onSaved,
                             )
-                        } else {
-                            viewModel.save(onSaved)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Save reminder") }
+                        },
+                        enabled = state.title.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    ) { Text("Save reminder") }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun WhenChip(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, modifier = modifier) {
+        Text(label, fontSize = 11.sp, maxLines = 1)
+    }
+}
+
+private fun reminderPresetMillis(key: String): Long {
+    val calendar = Calendar.getInstance()
+    when (key) {
+        "later" -> {
+            calendar.add(Calendar.HOUR_OF_DAY, 3)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+        }
+        "tm-morning" -> {
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+            calendar.set(Calendar.HOUR_OF_DAY, 9)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+        }
+        "tm-evening" -> {
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+            calendar.set(Calendar.HOUR_OF_DAY, 19)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+        }
+    }
+    return calendar.timeInMillis
 }
 
 @Composable

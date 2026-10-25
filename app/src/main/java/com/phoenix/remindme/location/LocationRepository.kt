@@ -120,31 +120,14 @@ class LocationRepository @Inject constructor(
         }
         cache[cacheKey]?.let { return@withContext it }
 
-        val queryTokens = normalized.split(Regex("[^a-z0-9]+"))
-            .filter { it.length >= 3 && it !in setOf("the", "near", "road", "street") }
-        val savedMatches = places.getAll()
-            .mapNotNull { place ->
-                val searchable = "${place.label} ${place.displayName} ${place.address}".lowercase(Locale.US)
-                val score = queryTokens.count(searchable::contains)
-                if (score == 0) null else score to PlaceCandidate(
-                    name = place.displayName,
-                    address = place.address,
-                    latitude = place.latitude,
-                    longitude = place.longitude,
-                    osmId = place.osmId,
-                    osmType = place.osmType,
-                    isSaved = true,
-                )
-            }
-            .sortedByDescending { it.first }
-            .map { it.second }
         val local = geocoderSearch(query, nearLatitude, nearLongitude)
         val remote = if (nearLatitude != null && nearLongitude != null || local.size < 3) {
             runCatching { nominatimSearch(query, nearLatitude, nearLongitude) }.getOrDefault(emptyList())
         } else {
             emptyList()
         }
-        val merged = (savedMatches + local + remote)
+        // Map/search matches only — saved places stay on the Set Location screen list.
+        val merged = (local + remote)
             .distinctBy { "${"%.5f".format(Locale.US, it.latitude)},${"%.5f".format(Locale.US, it.longitude)}" }
             .map { candidate ->
                 if (nearLatitude != null && nearLongitude != null) {
@@ -156,13 +139,10 @@ class LocationRepository @Inject constructor(
                         candidate.longitude,
                         distance,
                     )
-                    candidate.copy(distanceMeters = distance[0])
-                } else candidate
+                    candidate.copy(distanceMeters = distance[0], isSaved = false)
+                } else candidate.copy(isSaved = false)
             }
-            .sortedWith(
-                compareByDescending<PlaceCandidate> { it.isSaved }
-                    .thenBy { it.distanceMeters ?: Float.MAX_VALUE },
-            )
+            .sortedBy { it.distanceMeters ?: Float.MAX_VALUE }
             .take(8)
         cache[cacheKey] = merged
         if (cache.size > 30) cache.remove(cache.keys.first())

@@ -113,6 +113,55 @@ class NaturalLanguageScheduleTest {
     }
 
     @Test
+    fun tenOClockThisEveningStaysTonight() {
+        val evening = ZonedDateTime.of(2026, 10, 24, 21, 4, 0, 0, zone).toInstant()
+        listOf(
+            "remember to feed the cat at 10",
+            "remember to feed the cat at 10:00",
+        ).forEach { phrase ->
+            val parsed = Instant.ofEpochMilli(
+                NaturalLanguageSchedule.parse(phrase, evening, zone)!!.triggerTime,
+            ).atZone(zone)
+            assertEquals(phrase, 24, parsed.dayOfMonth)
+            assertEquals(phrase, 22, parsed.hour)
+            assertEquals(phrase, 0, parsed.minute)
+        }
+    }
+
+    @Test
+    fun bareHourInTheAfternoonUsesTheSameEvening() {
+        val afternoon = ZonedDateTime.of(2026, 9, 13, 14, 0, 0, 0, zone).toInstant()
+        val result = NaturalLanguageSchedule.parse(
+            "Remind me to feed the cat at 8",
+            afternoon,
+            zone,
+        )!!
+        val parsed = Instant.ofEpochMilli(result.triggerTime).atZone(zone)
+        assertEquals(13, parsed.dayOfMonth)
+        assertEquals(20, parsed.hour)
+        assertEquals(0, parsed.minute)
+    }
+
+    @Test
+    fun bareHourInTheMorningUsesThatMorning() {
+        val morning = ZonedDateTime.of(2026, 9, 13, 7, 0, 0, 0, zone).toInstant()
+        val result = NaturalLanguageSchedule.parse("feed the cat at 8:30", morning, zone)!!
+        val parsed = Instant.ofEpochMilli(result.triggerTime).atZone(zone)
+        assertEquals(13, parsed.dayOfMonth)
+        assertEquals(8, parsed.hour)
+        assertEquals(30, parsed.minute)
+    }
+
+    @Test
+    fun bareHourAfterBothTimesUsesTheNextMorning() {
+        val night = ZonedDateTime.of(2026, 9, 13, 21, 0, 0, 0, zone).toInstant()
+        val result = NaturalLanguageSchedule.parse("feed the cat at 8", night, zone)!!
+        val parsed = Instant.ofEpochMilli(result.triggerTime).atZone(zone)
+        assertEquals(14, parsed.dayOfMonth)
+        assertEquals(8, parsed.hour)
+    }
+
+    @Test
     fun everyOtherWeekIsUnderstood() {
         val result = NaturalLanguageSchedule.parse("water plants every other week at 8am", sundayEvening, zone)!!
         assertEquals("FREQ=WEEKLY;INTERVAL=2", result.recurrenceRule)

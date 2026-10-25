@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RemindMe comps</title>
+  <style>
+    :root {
+      --rm-bg: #080b14;
+      --rm-nav: #0a0c16;
+      --rm-glass: rgba(255, 255, 255, 0.07);
+      --rm-border: rgba(255, 255, 255, 0.1);
+      --rm-accent: #7b6ef6;
+      --rm-accent2: #3ecfcf;
+      --rm-warn: #f97316;
+      --rm-text: #f0f2f8;
+      --rm-muted: rgba(240, 242, 248, 0.7);
+      --rm-dim: rgba(240, 242, 248, 0.45);
+      --rm-danger: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #10131f;
+      color: var(--rm-text);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+    }
+    .page h1 {
+      font-size: 18px;
+      margin: 0 0 4px;
+    }
+    .page .lede {
+      margin: 0 0 16px;
+      font-size: 13px;
+      color: var(--rm-dim);
+      line-height: 1.4;
+    }
+    .stage {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .phone {
+      width: min(100%, 340px);
+      background: var(--rm-bg);
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      overflow: hidden;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      position: relative;
+    }
+    .status {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 18px 4px;
+      font-size: 11px;
+      color: var(--rm-muted);
+    }
+    .screen {
+      display: none;
+      flex-direction: column;
+      height: 620px;
+      position: relative;
+    }
+    .screen.is-active { display: flex; }
+    .scroll {
+      flex: 1;
+      overflow: auto;
+      padding: 8px 16px 88px;
+    }
+    .form {
+      flex: 1;
+      overflow: auto;
+      padding: 12px 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .form-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .form-stack[hidden],
+    #type-block[hidden],
+    #manual-continue[hidden],
+    #location-block[hidden],
+    #time-block[hidden] {
+      display: none !important;
+    }
+    .form-stack .primary {
+      margin-top: 8px;
+    }
+    .loc-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 4px;
+    }
+    .loc-actions .outline-btn {
+      margin-top: 0;
+    }
+    .greet-label { font-size: 12px; color: var(--rm-dim); margin: 0; }
+    .greet { font-size: 22px; font-weight: 700; margin: 2px 0 0; }
+    .date { font-size: 11px; color: var(--rm-dim); margin: 4px 0 14px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .stat {
+      background: var(--rm-glass);
+      border: 1px solid var(--rm-border);
+      border-radius: 12px;
+      padding: 10px 6px;
+      text-align: center;
+    }
+    .stat strong { display: block; font-size: 20px; line-height: 1.1; }
+    .stat span {
+      display: block;
+      font-size: 9px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--rm-dim);
+      margin-top: 2px;
+    }
+    .stat.a strong { color: var(--rm-accent); }
+    .stat.b strong { color: var(--rm-accent2); }
+    .stat.c strong { color: var(--rm-warn); }
+    .sec {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--rm-dim);
+      margin: 10px 0 6px;
+    }
+    .card {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--rm-glass);
+      border: 1px solid var(--rm-border);
+      border-radius: 14px;
+      padding: 10px 8px 10px 12px;
+      margin-bottom: 8px;
+    }
+    .card::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      border-radius: 14px 0 0 14px;
+      background: var(--rm-accent);
+    }
+    .card.loc::before { background: var(--rm-accent2); }
+    .card.is-new {
+      outline: 1px solid rgba(123, 110, 246, 0.55);
+      animation: pulse 1.2s ease-out 1;
+    }
+    @keyframes pulse {
+      from { box-shadow: 0 0 0 0 rgba(123, 110, 246, 0.45); }
+      to { box-shadow: 0 0 0 12px transparent; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .card.is-new { animation: none; }
+    }
+    .type {
+      width: 28px; height: 28px; border-radius: 8px;
+      display: grid; place-items: center; flex-shrink: 0;
+      background: rgba(123, 110, 246, 0.15); color: var(--rm-accent);
+    }
+    .card.loc .type {
+      background: rgba(62, 207, 207, 0.15); color: var(--rm-accent2);
+    }
+    .body { flex: 1; min-width: 0; }
+    .title {
+      font-size: 14px; font-weight: 600; margin: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .meta { font-size: 10px; color: var(--rm-accent); margin: 3px 0 0; }
+    .card.loc .meta { color: var(--rm-accent2); }
+    .remain { font-size: 10px; color: var(--rm-dim); margin: 2px 0 0; }
+    .actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+    .icon-btn {
+      width: 32px; height: 32px; border: 0; background: transparent;
+      border-radius: 8px; color: var(--rm-accent2);
+      display: grid; place-items: center; cursor: pointer; padding: 0;
+    }
+    .icon-btn.more { color: var(--rm-dim); }
+    .menu {
+      display: none;
+      position: absolute; right: 8px; top: 42px; z-index: 5;
+      min-width: 132px; background: #141826;
+      border: 1px solid var(--rm-border); border-radius: 10px; padding: 4px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    }
+    .menu.is-open { display: block; }
+    .menu button {
+      display: block; width: 100%; text-align: left; border: 0;
+      background: transparent; color: var(--rm-text); font: inherit;
+      font-size: 12px; padding: 8px 10px; border-radius: 6px; cursor: pointer;
+    }
+    .menu button:hover { background: rgba(255, 255, 255, 0.06); }
+    .menu .warn { color: var(--rm-warn); }
+    .menu .dim { color: var(--rm-dim); }
+    .dock {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      background: var(--rm-nav); border-top: 1px solid var(--rm-border);
+      padding: 6px 8px 10px;
+    }
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr 64px 1fr 1fr;
+      align-items: end; gap: 2px;
+    }
+    .tab {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      font-size: 9px; color: var(--rm-dim); padding-bottom: 2px;
+      border: 0; background: transparent; cursor: pointer;
+    }
+    .tab.on { color: var(--rm-accent); }
+    .fab-slot {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding-bottom: 4px;
+    }
+    .fab {
+      width: 52px; height: 52px; border-radius: 50%; border: 0;
+      background: var(--rm-accent); color: #fff;
+      display: grid; place-items: center;
+      box-shadow: 0 4px 14px rgba(123, 110, 246, 0.4);
+      cursor: pointer; user-select: none; touch-action: manipulation;
+    }
+    .fab:active { transform: scale(0.96); }
+    .hint {
+      position: absolute; left: 50%; bottom: 78px; transform: translateX(-50%);
+      width: max-content; max-width: 92%;
+      background: #1a1f33; border: 1px solid var(--rm-border);
+      border-radius: 8px; padding: 6px 10px; font-size: 10px; color: var(--rm-muted);
+      pointer-events: none; opacity: 0; transition: opacity 0.2s;
+    }
+    .phone.show-hint .hint { opacity: 1; }
+    .top {
+      display: flex; align-items: center; gap: 8px; padding: 8px 16px 0;
+    }
+    .top h2 { font-size: 18px; font-weight: 700; margin: 0; flex: 1; }
+    .top .link {
+      border: 0; background: transparent; color: var(--rm-dim);
+      font-size: 13px; cursor: pointer; padding: 4px;
+    }
+    .back {
+      border: 0; background: transparent; color: var(--rm-text);
+      font-size: 28px; line-height: 1; padding: 0 4px; cursor: pointer;
+    }
+    .voice-body {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      padding: 28px 20px 24px; text-align: center;
+    }
+    .mic-lg {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: var(--rm-accent); color: #fff;
+      display: grid; place-items: center; margin-bottom: 10px; border: 0; cursor: pointer;
+    }
+    .mic-lg.recording { box-shadow: 0 0 0 6px rgba(123, 110, 246, 0.25); }
+    .listen {
+      font-size: 14px; font-weight: 600; color: var(--rm-accent); margin: 0 0 18px;
+    }
+    .bars {
+      display: flex; align-items: center; justify-content: center;
+      gap: 4px; height: 40px; margin-bottom: 18px;
+    }
+    .bars span {
+      width: 4px; border-radius: 4px; background: var(--rm-accent); height: 12px;
+    }
+    .bars.is-live span:nth-child(odd) { background: var(--rm-accent2); height: 18px; }
+    .bars.is-live span:nth-child(3n) { height: 28px; }
+    .bars.is-live span:nth-child(4n) { height: 14px; }
+    .field {
+      width: 100%; min-height: 72px; background: transparent;
+      border: 1px solid var(--rm-border); border-radius: 10px;
+      color: var(--rm-text); font: inherit; font-size: 13px;
+      padding: 12px; text-align: left; resize: none;
+    }
+    .field::placeholder { color: var(--rm-dim); }
+    .cantalk {
+      margin-top: 16px; font-size: 12px; color: var(--rm-accent2);
+      background: transparent; border: 0; cursor: pointer;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+    .primary {
+      margin-top: auto; width: 100%; height: 48px; border: 0;
+      border-radius: 12px; background: var(--rm-accent); color: #fff;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    #manual-continue {
+      margin-top: 12px;
+    }
+    .primary:disabled {
+      background: rgba(123, 110, 246, 0.25); color: var(--rm-muted); cursor: default;
+    }
+    .cancel {
+      margin-top: 10px; border: 0; background: transparent;
+      color: var(--rm-dim); font-size: 13px; cursor: pointer;
+    }
+    .label {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+      color: var(--rm-dim); margin: 0 0 6px;
+    }
+    .input {
+      width: 100%; background: transparent; border: 1px solid var(--rm-border);
+      border-radius: 10px; color: var(--rm-text); font: inherit; font-size: 15px;
+      padding: 12px;
+    }
+    .input::placeholder { color: var(--rm-dim); font-style: italic; }
+    .segment { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .seg {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      height: 42px; border-radius: 12px; border: 1px solid var(--rm-border);
+      background: transparent; color: var(--rm-muted); font: inherit;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .seg.on {
+      background: rgba(123, 110, 246, 0.2);
+      border-color: rgba(123, 110, 246, 0.55);
+      color: var(--rm-accent);
+    }
+    .seg.place.on {
+      background: rgba(62, 207, 207, 0.15);
+      border-color: rgba(62, 207, 207, 0.5);
+      color: var(--rm-accent2);
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      border: 1px solid var(--rm-border); background: var(--rm-glass);
+      color: var(--rm-text); border-radius: 20px; padding: 8px 12px;
+      font: inherit; font-size: 12px; cursor: pointer;
+    }
+    .chip.on {
+      background: rgba(123, 110, 246, 0.22);
+      border-color: rgba(123, 110, 246, 0.55);
+      color: #fff;
+    }
+    .when-readout { font-size: 13px; color: var(--rm-accent); margin: 8px 0 0; }
+    .panel {
+      background: var(--rm-glass); border: 1px solid var(--rm-border);
+      border-radius: 14px; padding: 12px;
+    }
+    .toggle-row {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    }
+    .toggle-row strong { display: block; font-size: 13px; font-weight: 600; }
+    .toggle-row span { display: block; font-size: 11px; color: var(--rm-dim); margin-top: 2px; }
+    .switch {
+      width: 40px; height: 24px; border-radius: 12px;
+      background: rgba(255, 255, 255, 0.15); position: relative;
+      flex-shrink: 0; border: 0; cursor: pointer; padding: 0;
+    }
+    .switch.on { background: var(--rm-accent); }
+    .switch::after {
+      content: ""; position: absolute; top: 3px; left: 3px;
+      width: 18px; height: 18px; border-radius: 50%; background: #fff;
+    }
+    .switch.on::after { left: 19px; }
+    .repeat-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .repeat-btn {
+      border: 1px solid var(--rm-border); background: transparent;
+      color: var(--rm-muted); border-radius: 8px; padding: 6px 10px;
+      font: inherit; font-size: 11px; cursor: pointer;
+    }
+    .repeat-btn.on {
+      background: rgba(123, 110, 246, 0.2);
+      border-color: rgba(123, 110, 246, 0.5);
+      color: #fff;
+    }
+    .days { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .day {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 1px solid var(--rm-border); background: transparent;
+      color: var(--rm-muted); font: inherit; font-size: 11px; cursor: pointer;
+    }
+    .day.on {
+      background: rgba(62, 207, 207, 0.2);
+      border-color: rgba(62, 207, 207, 0.55);
+      color: #fff;
+    }
+    .tip-card {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: rgba(123, 110, 246, 0.1);
+      border: 1px solid rgba(123, 110, 246, 0.3);
+      border-radius: 14px; padding: 14px; color: var(--rm-accent);
+    }
+    .tip-card strong { display: block; font-size: 13px; }
+    .tip-card span { display: block; font-size: 11px; color: var(--rm-dim); margin-top: 2px; }
+    .map-hero {
+      position: relative; height: 210px; flex-shrink: 0;
+      background:
+        radial-gradient(circle at 55% 52%, rgba(62, 207, 207, 0.4) 0 10px, transparent 11px),
+        radial-gradient(circle at 55% 52%, rgba(62, 207, 207, 0.18) 0 var(--fence, 52px), transparent calc(var(--fence, 52px) + 1px)),
+        linear-gradient(160deg, #151a2e 0%, #0c1020 55%, #10182a 100%);
+      border-bottom: 1px solid var(--rm-border);
+    }
+    .map-hero.r50 { --fence: 28px; }
+    .map-hero.r150 { --fence: 52px; }
+    .map-hero.r300 { --fence: 78px; }
+    .map-hero.r500 { --fence: 108px; }
+    .map-roads {
+      position: absolute; inset: 0; opacity: 0.22;
+      background:
+        linear-gradient(90deg, transparent 48%, #fff 48.5%, #fff 51.5%, transparent 52%),
+        linear-gradient(0deg, transparent 62%, #fff 62.5%, #fff 64.5%, transparent 65%);
+    }
+    .map-pin {
+      position: absolute; left: 55%; top: 48%;
+      transform: translate(-50%, -100%); color: var(--rm-accent2);
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.45));
+    }
+    .map-chip {
+      position: absolute; top: 12px; display: flex; align-items: center;
+      background: rgba(16, 19, 29, 0.85); border-radius: 50px; padding: 2px;
+    }
+    .map-chip.start { left: 12px; }
+    .map-chip.end { right: 12px; }
+    .map-chip button {
+      border: 0; background: transparent; color: var(--rm-muted);
+      font: inherit; font-size: 12px; padding: 6px 10px; cursor: pointer;
+      border-radius: 50px;
+    }
+    .map-chip .iconish {
+      width: 34px; height: 34px; display: grid; place-items: center; color: #fff;
+    }
+    .map-attrib {
+      position: absolute; left: 8px; bottom: 6px;
+      font-size: 9px; color: rgba(255,255,255,0.45);
+    }
+    .verify-body {
+      flex: 1; overflow: auto; padding: 16px 16px 20px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .place-name { font-size: 18px; font-weight: 700; margin: 0; }
+    .place-addr { font-size: 12px; color: var(--rm-muted); margin: 2px 0 0; }
+    .outline-btn {
+      width: 100%; height: 42px; border-radius: 12px;
+      border: 1px solid var(--rm-border); background: transparent;
+      color: var(--rm-text); font: inherit; font-size: 13px; font-weight: 600;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      cursor: pointer;
+    }
+    .outline-btn:hover { background: rgba(255,255,255,0.04); }
+    .segment.three { grid-template-columns: 1fr 1fr 1fr; }
+    .radii { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .perm-card {
+      background: rgba(123, 110, 246, 0.1);
+      border: 1px solid rgba(123, 110, 246, 0.35);
+      border-radius: 14px; padding: 14px;
+    }
+    .perm-card p { margin: 0 0 10px; font-size: 12px; color: var(--rm-text); }
+    .note { font-size: 11px; color: var(--rm-dim); margin: 0; line-height: 1.4; }
+    .error { font-size: 12px; color: var(--rm-danger); margin: 0; }
+    .search-list { display: flex; flex-direction: column; gap: 6px; }
+    .search-item {
+      text-align: left; border: 1px solid var(--rm-border);
+      background: var(--rm-glass); border-radius: 12px; padding: 10px 12px;
+      color: var(--rm-text); font: inherit; cursor: pointer;
+    }
+    .search-item strong { display: block; font-size: 13px; }
+    .search-item span { display: block; font-size: 11px; color: var(--rm-dim); margin-top: 2px; }
+    .search-item.on {
+      border-color: rgba(62, 207, 207, 0.55);
+      background: rgba(62, 207, 207, 0.1);
+    }
+    .searching {
+      display: none; align-items: center; gap: 8px;
+      font-size: 12px; color: var(--rm-muted); margin-top: 8px;
+    }
+    .searching.show { display: flex; }
+    .spinner {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.2); border-top-color: var(--rm-accent);
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .spinner { animation: none; border-top-color: var(--rm-accent); }
+    }
+    .map-fs {
+      display: none; position: absolute; inset: 0; z-index: 12;
+      background: #000; flex-direction: column;
+    }
+    .map-fs.show { display: flex; }
+    .map-fs .map-hero { flex: 1; height: auto; border: 0; }
+    .toast {
+      position: absolute; left: 16px; right: 16px; bottom: 88px;
+      background: #1a1f33; border: 1px solid var(--rm-border);
+      border-radius: 10px; padding: 10px 12px; font-size: 12px;
+      color: var(--rm-muted); opacity: 0; pointer-events: none;
+      transition: opacity 0.2s; z-index: 8;
+    }
+    .toast.show { opacity: 1; }
+    .side {
+      flex: 1; min-width: min(100%, 260px);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px; padding: 14px;
+    }
+    .side h2 { font-size: 13px; margin: 0 0 8px; }
+    .side ol { margin: 0; padding-left: 18px; font-size: 12px; color: var(--rm-muted); line-height: 1.55; }
+    .side code {
+      font-size: 11px; background: rgba(255, 255, 255, 0.06);
+      padding: 1px 5px; border-radius: 4px;
+    }
+    .path {
+      margin-top: 12px; font-size: 12px; color: var(--rm-accent2);
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>RemindMe interactive comps</h1>
+    <p class="lede">Manual builder reveals step by step: What → Continue → Time / Location. Time unlocks When + options. Location opens the full set-location flow, then returns here with details, alarm, Save, and Change location.</p>
+
+    <div class="stage">
+      <div class="phone" id="phone">
+        <div class="status"><span>9:41</span><span>LTE</span></div>
+        <div class="toast" id="toast" role="status"></div>
+
+        <!-- HOME -->
+        <div class="screen is-active" id="screen-home" data-screen="home">
+          <div class="scroll">
+            <p class="greet-label">Good evening,</p>
+            <p class="greet">Alex</p>
+            <p class="date" id="home-date"></p>
+            <div class="stats">
+              <div class="stat a"><strong id="stat-today">2</strong><span>Due today</span></div>
+              <div class="stat b"><strong id="stat-loc">1</strong><span>Location</span></div>
+              <div class="stat c"><strong>0</strong><span>Snoozed</span></div>
+            </div>
+            <p class="sec">Today</p>
+            <div id="list-today"></div>
+            <p class="sec">Upcoming</p>
+            <div id="list-upcoming"></div>
+          </div>
+          <div class="hint" id="hint">Tap mic → voice · Hold mic → manual</div>
+          <div class="dock">
+            <div class="tabs">
+              <button type="button" class="tab on">Today</button>
+              <button type="button" class="tab">Upcoming</button>
+              <div class="fab-slot">
+                <button type="button" class="fab" id="fab" aria-label="Create reminder. Long-press for manual.">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a4 4 0 0 1 4 4v4a4 4 0 0 1-8 0V7a4 4 0 0 1 4-4z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+                </button>
+              </div>
+              <button type="button" class="tab">Places</button>
+              <button type="button" class="tab">Settings</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- VOICE -->
+        <div class="screen" id="screen-voice" data-screen="voice">
+          <div class="top">
+            <button type="button" class="back" data-go="home" aria-label="Back">‹</button>
+            <h2>New Reminder</h2>
+          </div>
+          <div class="voice-body">
+            <button type="button" class="mic-lg recording" id="voice-mic" aria-label="Toggle listening">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a4 4 0 0 1 4 4v4a4 4 0 0 1-8 0V7a4 4 0 0 1 4-4z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+            </button>
+            <p class="listen" id="voice-status">Listening…</p>
+            <div class="bars is-live" id="voice-bars" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <textarea class="field" id="voice-text" rows="3" placeholder="Your words will appear here…"></textarea>
+            <button type="button" class="cantalk" data-go="manual">Can't talk right now? Create manually</button>
+            <button type="button" class="primary" id="voice-done" disabled>Done — Create Reminder Now</button>
+            <button type="button" class="cancel" data-go="home">Cancel</button>
+          </div>
+        </div>
+
+        <!-- MANUAL BUILDER (progressive) -->
+        <div class="screen" id="screen-manual" data-screen="manual">
+          <div class="top">
+            <button type="button" class="back" id="manual-back" aria-label="Back">‹</button>
+            <h2>New Reminder</h2>
+            <button type="button" class="link" data-go="home">Cancel</button>
+          </div>
+          <div class="form">
+            <div id="what-block">
+              <p class="label">What</p>
+              <input class="input" id="manual-title" type="text" placeholder="What do you need to remember?" />
+              <p class="error" id="what-need-title" hidden>Add what you need to remember.</p>
+              <button type="button" class="primary" id="manual-continue">Continue</button>
+            </div>
+
+            <div id="type-block" hidden>
+              <p class="label">Remind me by</p>
+              <div class="segment" role="group" aria-label="Trigger type">
+                <button type="button" class="seg" id="mode-time" aria-pressed="false">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                  Time
+                </button>
+                <button type="button" class="seg place" id="mode-place" aria-pressed="false">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                  Location
+                </button>
+              </div>
+            </div>
+
+            <div id="time-block" hidden class="form-stack">
+              <div>
+                <p class="label">When</p>
+                <div class="chips" id="when-chips">
+                  <button type="button" class="chip" data-when="later">Later today</button>
+                  <button type="button" class="chip on" data-when="tm-morning">Tomorrow morning</button>
+                  <button type="button" class="chip" data-when="tm-evening">Tomorrow evening</button>
+                  <button type="button" class="chip" data-when="custom">Pick date &amp; time</button>
+                </div>
+                <p class="when-readout" id="when-readout"></p>
+                <div id="custom-when" hidden style="margin-top:8px;display:none;gap:8px">
+                  <input class="input" id="custom-date" type="date" />
+                  <input class="input" id="custom-time" type="time" />
+                </div>
+              </div>
+              <div class="panel">
+                <div class="toggle-row">
+                  <div>
+                    <strong>Repeat</strong>
+                    <span>Schedule this reminder again.</span>
+                  </div>
+                  <button type="button" class="switch" id="repeat-switch" aria-pressed="false" aria-label="Repeat"></button>
+                </div>
+                <div id="repeat-options" hidden>
+                  <div class="repeat-row" id="repeat-presets">
+                    <button type="button" class="repeat-btn on" data-freq="DAILY">Daily</button>
+                    <button type="button" class="repeat-btn" data-freq="WEEKLY">Weekly</button>
+                    <button type="button" class="repeat-btn" data-freq="WEEKDAYS">Weekdays</button>
+                    <button type="button" class="repeat-btn" data-freq="MONTHLY">Monthly</button>
+                  </div>
+                  <div class="days" id="weekday-row" hidden>
+                    <button type="button" class="day" data-day="MO">M</button>
+                    <button type="button" class="day" data-day="TU">T</button>
+                    <button type="button" class="day" data-day="WE">W</button>
+                    <button type="button" class="day" data-day="TH">T</button>
+                    <button type="button" class="day" data-day="FR">F</button>
+                    <button type="button" class="day" data-day="SA">S</button>
+                    <button type="button" class="day" data-day="SU">S</button>
+                  </div>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="toggle-row">
+                  <div>
+                    <strong>Alarm until acknowledged</strong>
+                    <span>Loops until Done, Snooze, or Dismiss.</span>
+                  </div>
+                  <button type="button" class="switch on" id="alarm-switch-time" aria-pressed="true" aria-label="Alarm"></button>
+                </div>
+              </div>
+              <button type="button" class="primary" id="save-time">Save reminder</button>
+            </div>
+
+            <div id="location-block" hidden class="form-stack">
+              <div>
+                <p class="label">Location</p>
+                <div class="panel" id="location-summary">
+                  <p class="place-name" id="manual-loc-name" style="font-size:15px">Home</p>
+                  <p class="place-addr" id="manual-loc-addr">14 Oak Street, Toronto, ON</p>
+                  <p class="note" id="manual-loc-meta" style="margin-top:8px;color:var(--rm-accent2)"></p>
+                </div>
+              </div>
+              <div class="loc-actions">
+                <button type="button" class="outline-btn" id="change-location">Change location</button>
+                <div class="panel">
+                  <div class="toggle-row">
+                    <div>
+                      <strong>Alarm until acknowledged</strong>
+                      <span>Loops until Done, Snooze, or Dismiss.</span>
+                    </div>
+                    <button type="button" class="switch on" id="alarm-switch-place" aria-pressed="true" aria-label="Alarm"></button>
+                  </div>
+                </div>
+                <button type="button" class="primary" id="save-place-final">Save reminder</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PLACE: SET LOCATION (search + saved) -->
+        <div class="screen" id="screen-place-search" data-screen="place-search">
+          <div class="top">
+            <button type="button" class="back" data-go="manual" aria-label="Back">‹</button>
+            <h2>Set Location</h2>
+            <button type="button" class="link" data-go="manual">Cancel</button>
+          </div>
+          <div class="form">
+            <p class="note">For: <strong id="place-title-carry" style="color:var(--rm-text)"></strong></p>
+            <div class="tip-card">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+              <div>
+                <strong>Find the place</strong>
+                <span>Type a business, address, or landmark</span>
+              </div>
+            </div>
+            <div>
+              <input class="input" id="place-query" type="search" placeholder="Search a place, address, or landmark" />
+              <button type="button" class="primary" id="place-search-btn" style="margin-top:8px">Search</button>
+              <div class="searching" id="place-searching"><span class="spinner"></span> Searching…</div>
+              <p class="error" id="place-search-error" hidden></p>
+            </div>
+            <div>
+              <p class="label">Saved places</p>
+              <div class="search-list" id="saved-places"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PLACE: SEARCH RESULTS -->
+        <div class="screen" id="screen-place-results" data-screen="place-results">
+          <div class="top">
+            <button type="button" class="back" data-go="place-search" aria-label="Back">‹</button>
+            <h2>Search Results</h2>
+            <button type="button" class="link" data-go="manual">Cancel</button>
+          </div>
+          <div class="form">
+            <div>
+              <p id="results-query" style="margin:0;color:var(--rm-muted)"></p>
+              <p class="note" id="results-count" style="margin-top:4px"></p>
+            </div>
+            <div class="search-list" id="search-results"></div>
+            <button type="button" class="outline-btn" data-go="place-search">Search for a different place</button>
+          </div>
+        </div>
+
+        <!-- PLACE: VERIFY / MAP / OPTIONS -->
+        <div class="screen" id="screen-place-verify" data-screen="place-verify">
+          <div class="map-hero r150" id="verify-map">
+            <div class="map-roads" aria-hidden="true"></div>
+            <div class="map-pin">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+            </div>
+            <div class="map-chip start">
+              <button type="button" class="iconish" data-go="place-results" aria-label="Back">‹</button>
+            </div>
+            <div class="map-chip end">
+              <button type="button" data-go="manual">Cancel</button>
+              <button type="button" class="iconish" id="map-fs-open" aria-label="View map full screen">⛶</button>
+            </div>
+            <div class="map-attrib">© OpenStreetMap contributors</div>
+          </div>
+          <div class="verify-body">
+            <div>
+              <p class="place-name" id="cfg-name">Home</p>
+              <p class="place-addr" id="cfg-addr">14 Oak Street, Toronto, ON</p>
+            </div>
+            <button type="button" class="outline-btn" id="open-maps">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20l-5-2V4l5 2 6-2 5 2v14l-5-2-6 2z"/><path d="M9 6v14M15 4v14"/></svg>
+              Open in Maps
+            </button>
+            <div>
+              <p class="label">Trigger</p>
+              <div class="segment three" id="trigger-seg">
+                <button type="button" class="seg place on" data-trigger="ARRIVING" aria-pressed="true">Arriving</button>
+                <button type="button" class="seg" data-trigger="LEAVING" aria-pressed="false">Leaving</button>
+                <button type="button" class="seg" data-trigger="EITHER" aria-pressed="false">Either</button>
+              </div>
+            </div>
+            <div>
+              <p class="label">Offset minutes</p>
+              <input class="input" id="cfg-offset" type="number" min="0" value="0" />
+              <p class="note" style="margin-top:6px">Alert still fires if you leave during the offset.</p>
+            </div>
+            <div>
+              <p class="label">Geofence radius</p>
+              <div class="radii" id="radius-row">
+                <button type="button" class="repeat-btn" data-radius="50">50m</button>
+                <button type="button" class="repeat-btn on" data-radius="150">150m</button>
+                <button type="button" class="repeat-btn" data-radius="300">300m</button>
+                <button type="button" class="repeat-btn" data-radius="500">500m</button>
+              </div>
+            </div>
+            <div class="perm-card" id="perm-card">
+              <p id="perm-text">Precise location is required to create a geofence.</p>
+              <button type="button" class="primary" id="perm-allow" style="margin-top:0">Allow location</button>
+            </div>
+            <button type="button" class="primary" id="save-place" disabled>Use This Location</button>
+            <p class="note">Saves here — no bounce through a thin Review screen.</p>
+          </div>
+          <div class="map-fs" id="map-fs" aria-label="Full screen map">
+            <div class="map-hero r150" id="verify-map-fs">
+              <div class="map-roads" aria-hidden="true"></div>
+              <div class="map-pin">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+              </div>
+              <div class="map-chip end" style="top:16px;right:16px">
+                <button type="button" data-go="manual">Cancel</button>
+                <button type="button" class="iconish" id="map-fs-close" aria-label="Exit full screen">✕</button>
+              </div>
+              <div class="map-attrib">© OpenStreetMap contributors</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side">
+        <h2>Try these paths</h2>
+        <ol>
+          <li>Manual: type <strong>What</strong> → <strong>Continue</strong> → Time / Location.</li>
+          <li><strong>Time</strong> → When chips + Repeat + Alarm → <strong>Save reminder</strong>.</li>
+          <li><strong>Location</strong> → Set Location flow → map verify → <strong>Use This Location</strong> → back to builder with details + Alarm + Save; <strong>Change location</strong> reopens the flow.</li>
+          <li>Mic tap = voice; hold = manual.</li>
+        </ol>
+        <p class="path" id="path-label">Path: Home</p>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    var phone = document.getElementById("phone");
+    var toastEl = document.getElementById("toast");
+    var pathLabel = document.getElementById("path-label");
+    var fab = document.getElementById("fab");
+    var longPressTimer = null;
+    var longPressFired = false;
+
+    var state = {
+      screen: "home",
+      reminders: [
+        { id: 1, title: "Call Mom", kind: "time", when: "Sat · Oct 24 · 7:00 PM", remain: "Due in 2h 14m", section: "today" },
+        { id: 2, title: "Pick up dry cleaning", kind: "place", when: "At Home", remain: "", section: "today" },
+        { id: 3, title: "Dentist appointment", kind: "time", when: "Thu · Nov 27 · 10:00 AM", remain: "Due in 33d 12h", section: "upcoming" }
+      ],
+      nextId: 4,
+      whenKey: "tm-morning",
+      whenLabel: "",
+      repeat: false,
+      freq: "DAILY",
+      weekdays: { MO: true, TU: true, WE: true, TH: true, FR: true, SA: false, SU: false },
+      alarm: true,
+      place: null,
+      placeSource: "saved",
+      searchHits: [],
+      lastQuery: "",
+      trigger: "ARRIVING",
+      radius: 150,
+      offsetMinutes: 0,
+      fineGranted: false,
+      backgroundGranted: false,
+      listening: true,
+      builderStep: "what"
+    };
+
+    var savedPlaces = [
+      { name: "Home", address: "14 Oak Street, Toronto, ON", lat: 43.6532, lng: -79.3832, saved: true },
+      { name: "Work", address: "200 Bay Street, Toronto, ON", lat: 43.6466, lng: -79.3795, saved: true }
+    ];
+
+    var directory = [
+      { name: "Home", address: "14 Oak Street, Toronto, ON", lat: 43.6532, lng: -79.3832, saved: true, distance: "0.2 km" },
+      { name: "Work", address: "200 Bay Street, Toronto, ON", lat: 43.6466, lng: -79.3795, saved: true, distance: "1.1 km" },
+      { name: "Dry Cleaners", address: "88 Queen St W, Toronto, ON", lat: 43.651, lng: -79.381, saved: false, distance: "0.8 km" },
+      { name: "Grocery", address: "60 Absolute Ave, Mississauga, ON", lat: 43.589, lng: -79.644, saved: false, distance: "18 km" },
+      { name: "TD Bank", address: "55 King St W, Toronto, ON", lat: 43.648, lng: -79.381, saved: false, distance: "1.4 km" },
+      { name: "Pharmacy", address: "123 Yonge St, Toronto, ON", lat: 43.6515, lng: -79.379, saved: false, distance: "0.6 km" }
+    ];
+
+    function fmt(d) {
+      return d.toLocaleString(undefined, {
+        weekday: "short", month: "short", day: "numeric",
+        hour: "numeric", minute: "2-digit"
+      }).replace(",", " ·");
+    }
+
+    function computeWhen(key) {
+      var now = new Date();
+      var d = new Date(now);
+      if (key === "later") {
+        d.setHours(now.getHours() + 3, 0, 0, 0);
+      } else if (key === "tm-morning") {
+        d.setDate(d.getDate() + 1);
+        d.setHours(9, 0, 0, 0);
+      } else if (key === "tm-evening") {
+        d.setDate(d.getDate() + 1);
+        d.setHours(19, 0, 0, 0);
+      } else if (key === "custom") {
+        var date = document.getElementById("custom-date").value;
+        var time = document.getElementById("custom-time").value;
+        if (date && time) d = new Date(date + "T" + time);
+      }
+      state.whenLabel = fmt(d);
+      return state.whenLabel;
+    }
+
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add("show");
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(function () { toastEl.classList.remove("show"); }, 1800);
+    }
+
+    function go(name) {
+      state.screen = name;
+      document.querySelectorAll(".screen").forEach(function (el) {
+        el.classList.toggle("is-active", el.getAttribute("data-screen") === name);
+      });
+      var labels = {
+        home: "Path: Home",
+        voice: "Path: Home → Voice",
+        manual: "Path: Manual time sheet",
+        "place-search": "Path: Manual → Set Location",
+        "place-results": "Path: Manual → Search Results",
+        "place-verify": "Path: Manual → Map verify → Use This Location"
+      };
+      pathLabel.textContent = labels[name] || ("Path: " + name);
+      document.getElementById("map-fs").classList.remove("show");
+      if (name === "manual") {
+        syncBuilder();
+      }
+      if (name === "place-search") {
+        document.getElementById("place-title-carry").textContent =
+          document.getElementById("manual-title").value.trim() || "(untitled)";
+        document.getElementById("place-search-error").hidden = true;
+        renderSavedPlaces(document.getElementById("place-query").value);
+      }
+      if (name === "place-verify") {
+        syncPlaceConfig();
+      }
+      if (name === "voice") {
+        state.listening = true;
+        syncVoice();
+      }
+      if (name === "home") {
+        phone.classList.add("show-hint");
+        setTimeout(function () { phone.classList.remove("show-hint"); }, 2500);
+      }
+    }
+
+    function renderHome() {
+      document.getElementById("home-date").textContent = new Date().toLocaleDateString(undefined, {
+        weekday: "long", month: "long", day: "numeric"
+      });
+      var today = state.reminders.filter(function (r) { return r.section === "today"; });
+      var upcoming = state.reminders.filter(function (r) { return r.section === "upcoming"; });
+      document.getElementById("stat-today").textContent = String(today.length);
+      document.getElementById("stat-loc").textContent = String(
+        state.reminders.filter(function (r) { return r.kind === "place"; }).length
+      );
+      document.getElementById("list-today").innerHTML = today.map(cardHtml).join("");
+      document.getElementById("list-upcoming").innerHTML = upcoming.map(cardHtml).join("");
+    }
+
+    function cardHtml(r) {
+      var icon = r.kind === "place"
+        ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>'
+        : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+      return (
+        '<div class="card ' + (r.kind === "place" ? "loc " : "") + (r.isNew ? "is-new" : "") + '" data-id="' + r.id + '">' +
+          '<div class="type" aria-hidden="true">' + icon + '</div>' +
+          '<div class="body">' +
+            '<p class="title"></p>'.replace("></p>", ">" + escapeHtml(r.title) + "</p>") +
+            '<p class="meta">' + escapeHtml(r.when) + "</p>" +
+            (r.remain ? '<p class="remain">' + escapeHtml(r.remain) + "</p>" : "") +
+          "</div>" +
+          '<div class="actions">' +
+            '<button type="button" class="icon-btn" data-complete="' + r.id + '" aria-label="Complete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg></button>' +
+            '<button type="button" class="icon-btn more" data-menu="' + r.id + '" aria-label="More actions"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg></button>' +
+          "</div>" +
+          '<div class="menu" id="menu-' + r.id + '" role="menu">' +
+            '<button type="button" class="warn" data-snooze="' + r.id + '">Snooze</button>' +
+            '<button type="button" class="dim" data-delete="' + r.id + '">Delete</button>' +
+          "</div>" +
+        "</div>"
+      );
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+      });
+    }
+
+    function syncBuilder() {
+      var step = state.builderStep;
+      document.getElementById("manual-continue").hidden = step !== "what";
+      document.getElementById("type-block").hidden = step === "what";
+      document.getElementById("time-block").hidden = step !== "time";
+      document.getElementById("location-block").hidden = step !== "location";
+      document.getElementById("what-need-title").hidden = true;
+
+      var timeOn = step === "time";
+      var locOn = step === "location";
+      document.getElementById("mode-time").classList.toggle("on", timeOn);
+      document.getElementById("mode-place").classList.toggle("on", locOn);
+      document.getElementById("mode-place").classList.toggle("place", locOn);
+      document.getElementById("mode-time").setAttribute("aria-pressed", timeOn ? "true" : "false");
+      document.getElementById("mode-place").setAttribute("aria-pressed", locOn ? "true" : "false");
+
+      if (step === "time") {
+        syncWhenUI();
+        syncRepeatUI();
+      }
+      if (step === "location" && state.place) {
+        document.getElementById("manual-loc-name").textContent = state.place.name;
+        document.getElementById("manual-loc-addr").textContent = state.place.address;
+        var triggerLabel =
+          state.trigger === "ARRIVING" ? "Arriving" :
+          state.trigger === "LEAVING" ? "Leaving" : "Arrive or leave";
+        var meta = triggerLabel +
+          (state.offsetMinutes > 0 ? " · +" + state.offsetMinutes + " min" : " · Immediately") +
+          " · " + state.radius + " m radius";
+        document.getElementById("manual-loc-meta").textContent = meta;
+      }
+
+      var labels = {
+        what: "Path: Manual → What",
+        choose: "Path: Manual → Time / Location",
+        time: "Path: Manual → Time → When + options",
+        location: "Path: Manual → Location chosen → Save"
+      };
+      if (state.screen === "manual") pathLabel.textContent = labels[step] || pathLabel.textContent;
+    }
+
+    function setBuilderStep(step) {
+      state.builderStep = step;
+      syncBuilder();
+    }
+
+    function syncWhenUI() {
+      document.querySelectorAll("#when-chips .chip").forEach(function (chip) {
+        chip.classList.toggle("on", chip.getAttribute("data-when") === state.whenKey);
+      });
+      var custom = document.getElementById("custom-when");
+      var showCustom = state.whenKey === "custom";
+      custom.hidden = !showCustom;
+      custom.style.display = showCustom ? "grid" : "none";
+      if (showCustom) {
+        custom.style.gridTemplateColumns = "1fr 1fr";
+        if (!document.getElementById("custom-date").value) {
+          var t = new Date();
+          t.setDate(t.getDate() + 1);
+          document.getElementById("custom-date").value = t.toISOString().slice(0, 10);
+          document.getElementById("custom-time").value = "09:00";
+        }
+      }
+      document.getElementById("when-readout").textContent = computeWhen(state.whenKey);
+    }
+
+    function syncRepeatUI() {
+      var on = state.repeat;
+      document.getElementById("repeat-switch").classList.toggle("on", on);
+      document.getElementById("repeat-switch").setAttribute("aria-pressed", on ? "true" : "false");
+      document.getElementById("repeat-options").hidden = !on;
+      document.querySelectorAll("#repeat-presets .repeat-btn").forEach(function (btn) {
+        btn.classList.toggle("on", btn.getAttribute("data-freq") === state.freq);
+      });
+      var showDays = on && state.freq === "WEEKLY";
+      document.getElementById("weekday-row").hidden = !showDays;
+      document.querySelectorAll("#weekday-row .day").forEach(function (btn) {
+        btn.classList.toggle("on", !!state.weekdays[btn.getAttribute("data-day")]);
+      });
+    }
+
+    function renderSavedPlaces(query) {
+      var q = (query || "").trim().toLowerCase();
+      var list = savedPlaces.filter(function (p) {
+        return !q || p.name.toLowerCase().indexOf(q) >= 0 || p.address.toLowerCase().indexOf(q) >= 0;
+      });
+      var el = document.getElementById("saved-places");
+      el._filtered = list;
+      el.innerHTML = list.map(function (p, i) {
+        return (
+          '<button type="button" class="search-item" data-saved-index="' + i + '">' +
+            "<strong>" + escapeHtml(p.name) + "</strong>" +
+            "<span>" + escapeHtml(p.address) + "</span>" +
+          "</button>"
+        );
+      }).join("") || '<p class="note">No saved places match.</p>';
+    }
+
+    function runSearch() {
+      var q = document.getElementById("place-query").value.trim();
+      var err = document.getElementById("place-search-error");
+      if (!q) {
+        err.textContent = "Enter a place, address, or landmark.";
+        err.hidden = false;
+        return;
+      }
+      err.hidden = true;
+      state.lastQuery = q;
+      var searching = document.getElementById("place-searching");
+      searching.classList.add("show");
+      document.getElementById("place-search-btn").disabled = true;
+      setTimeout(function () {
+        searching.classList.remove("show");
+        document.getElementById("place-search-btn").disabled = false;
+        var ql = q.toLowerCase();
+        state.searchHits = directory.filter(function (p) {
+          return p.name.toLowerCase().indexOf(ql) >= 0 || p.address.toLowerCase().indexOf(ql) >= 0;
+        });
+        if (!state.searchHits.length) {
+          // fuzzy demo: always show a couple nearby matches
+          state.searchHits = directory.slice(2, 5);
+        }
+        renderSearchResults();
+        go("place-results");
+      }, 650);
+    }
+
+    function renderSearchResults() {
+      document.getElementById("results-query").textContent = "“" + state.lastQuery + "”";
+      document.getElementById("results-count").textContent =
+        state.searchHits.length + " matches · confirm the correct location";
+      var el = document.getElementById("search-results");
+      el._filtered = state.searchHits;
+      el.innerHTML = state.searchHits.map(function (p, i) {
+        var title = p.saved ? p.name + " · Saved" : p.name;
+        var detail = p.address + (p.distance ? " · " + p.distance : "");
+        return (
+          '<button type="button" class="search-item" data-result-index="' + i + '">' +
+            "<strong>" + escapeHtml(title) + "</strong>" +
+            "<span>" + escapeHtml(detail) + "</span>" +
+          "</button>"
+        );
+      }).join("");
+    }
+
+    function selectPlace(place, source) {
+      state.place = place;
+      state.placeSource = source;
+      state.trigger = "ARRIVING";
+      state.radius = 150;
+      go("place-verify");
+    }
+
+    function syncPlaceConfig() {
+      if (!state.place) return;
+      document.getElementById("cfg-name").textContent = state.place.name;
+      document.getElementById("cfg-addr").textContent = state.place.address;
+      document.querySelectorAll("#trigger-seg .seg").forEach(function (btn) {
+        var on = btn.getAttribute("data-trigger") === state.trigger;
+        btn.classList.toggle("on", on);
+        btn.classList.toggle("place", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      document.querySelectorAll("#radius-row .repeat-btn").forEach(function (btn) {
+        btn.classList.toggle("on", Number(btn.getAttribute("data-radius")) === state.radius);
+      });
+      ["verify-map", "verify-map-fs"].forEach(function (id) {
+        var map = document.getElementById(id);
+        map.classList.remove("r50", "r150", "r300", "r500");
+        map.classList.add("r" + state.radius);
+      });
+      var ready = state.fineGranted && state.backgroundGranted;
+      var perm = document.getElementById("perm-card");
+      perm.hidden = ready;
+      if (!state.fineGranted) {
+        document.getElementById("perm-text").textContent =
+          "Precise location is required to create a geofence.";
+      } else if (!state.backgroundGranted) {
+        document.getElementById("perm-text").textContent =
+          "Allow location access “all the time” so reminders work when the app is closed.";
+      }
+      var save = document.getElementById("save-place");
+      save.disabled = !ready;
+      save.textContent = ready ? "Use This Location" : "Use This Location";
+      var backBtn = document.querySelector("#screen-place-verify .map-chip.start button");
+      if (backBtn) {
+        backBtn.setAttribute("data-go", state.placeSource === "search" ? "place-results" : "place-search");
+      }
+    }
+
+    function syncVoice() {
+      document.getElementById("voice-mic").classList.toggle("recording", state.listening);
+      document.getElementById("voice-bars").classList.toggle("is-live", state.listening);
+      document.getElementById("voice-status").textContent = state.listening ? "Listening…" : "Paused — tap mic to continue";
+      var text = document.getElementById("voice-text").value.trim();
+      document.getElementById("voice-done").disabled = !text;
+    }
+
+    function addReminder(reminder) {
+      reminder.id = state.nextId++;
+      reminder.isNew = true;
+      state.reminders.unshift(reminder);
+      renderHome();
+      go("home");
+      showToast("Saved “" + reminder.title + "”");
+      setTimeout(function () {
+        state.reminders.forEach(function (r) { r.isNew = false; });
+        renderHome();
+      }, 1600);
+    }
+
+    function openManual(prefill) {
+      document.getElementById("manual-title").value = prefill || "";
+      state.whenKey = "tm-morning";
+      state.repeat = false;
+      state.freq = "DAILY";
+      state.alarm = true;
+      state.place = null;
+      state.builderStep = prefill ? "choose" : "what";
+      document.getElementById("alarm-switch-time").classList.add("on");
+      document.getElementById("alarm-switch-place").classList.add("on");
+      go("manual");
+      setTimeout(function () { document.getElementById("manual-title").focus(); }, 50);
+    }
+
+    function returnToManualWithPlace() {
+      state.offsetMinutes = Number(document.getElementById("cfg-offset").value) || 0;
+      state.builderStep = "location";
+      go("manual");
+      showToast("Location added — review and save");
+    }
+
+    // FAB long / short press
+    function clearLongPress() {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    }
+    fab.addEventListener("pointerdown", function (e) {
+      longPressFired = false;
+      clearLongPress();
+      longPressTimer = setTimeout(function () {
+        longPressFired = true;
+        phone.classList.remove("show-hint");
+        openManual("");
+        showToast("Long-press → manual");
+      }, 480);
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (evt) {
+      fab.addEventListener(evt, function () {
+        clearLongPress();
+        if (evt === "pointerup" && !longPressFired) {
+          go("voice");
+        }
+      });
+    });
+
+    // Global delegated clicks
+    document.addEventListener("click", function (e) {
+      var goBtn = e.target.closest("[data-go]");
+      if (goBtn) {
+        var dest = goBtn.getAttribute("data-go");
+        if (dest === "manual") openManual(document.getElementById("voice-text").value.trim());
+        else go(dest);
+        return;
+      }
+
+      var complete = e.target.closest("[data-complete]");
+      if (complete) {
+        var cid = Number(complete.getAttribute("data-complete"));
+        state.reminders = state.reminders.filter(function (r) { return r.id !== cid; });
+        renderHome();
+        showToast("Completed");
+        return;
+      }
+      var del = e.target.closest("[data-delete]");
+      if (del) {
+        var did = Number(del.getAttribute("data-delete"));
+        state.reminders = state.reminders.filter(function (r) { return r.id !== did; });
+        renderHome();
+        showToast("Deleted");
+        return;
+      }
+      var snooze = e.target.closest("[data-snooze]");
+      if (snooze) {
+        showToast("Snoozed 10 minutes");
+        document.querySelectorAll(".menu.is-open").forEach(function (m) { m.classList.remove("is-open"); });
+        return;
+      }
+      var menuBtn = e.target.closest("[data-menu]");
+      if (menuBtn) {
+        var mid = menuBtn.getAttribute("data-menu");
+        var menu = document.getElementById("menu-" + mid);
+        var open = menu.classList.contains("is-open");
+        document.querySelectorAll(".menu.is-open").forEach(function (m) { m.classList.remove("is-open"); });
+        if (!open) menu.classList.add("is-open");
+        return;
+      }
+
+      if (e.target.closest("#manual-continue")) {
+        var title0 = document.getElementById("manual-title").value.trim();
+        if (!title0) {
+          document.getElementById("what-need-title").hidden = false;
+          document.getElementById("manual-title").focus();
+          return;
+        }
+        setBuilderStep("choose");
+        return;
+      }
+      if (e.target.closest("#manual-back")) {
+        if (state.builderStep === "time" || state.builderStep === "location") {
+          setBuilderStep("choose");
+          return;
+        }
+        if (state.builderStep === "choose") {
+          setBuilderStep("what");
+          return;
+        }
+        go("home");
+        return;
+      }
+      if (e.target.closest("#mode-time")) {
+        setBuilderStep("time");
+        return;
+      }
+      if (e.target.closest("#mode-place")) {
+        go("place-search");
+        return;
+      }
+      if (e.target.closest("#change-location")) {
+        go("place-search");
+        return;
+      }
+
+      var whenChip = e.target.closest("#when-chips .chip");
+      if (whenChip) {
+        state.whenKey = whenChip.getAttribute("data-when");
+        syncWhenUI();
+        return;
+      }
+
+      if (e.target.closest("#repeat-switch")) {
+        state.repeat = !state.repeat;
+        syncRepeatUI();
+        return;
+      }
+      var freqBtn = e.target.closest("#repeat-presets .repeat-btn");
+      if (freqBtn) {
+        state.freq = freqBtn.getAttribute("data-freq");
+        syncRepeatUI();
+        return;
+      }
+      var dayBtn = e.target.closest("#weekday-row .day");
+      if (dayBtn) {
+        var day = dayBtn.getAttribute("data-day");
+        state.weekdays[day] = !state.weekdays[day];
+        syncRepeatUI();
+        return;
+      }
+      if (e.target.closest("#alarm-switch-time") || e.target.closest("#alarm-switch-place")) {
+        state.alarm = !state.alarm;
+        ["alarm-switch-time", "alarm-switch-place"].forEach(function (id) {
+          var el = document.getElementById(id);
+          el.classList.toggle("on", state.alarm);
+          el.setAttribute("aria-pressed", state.alarm ? "true" : "false");
+        });
+        return;
+      }
+
+      if (e.target.closest("#save-time")) {
+        var t = document.getElementById("manual-title").value.trim();
+        if (!t) {
+          document.getElementById("manual-title").focus();
+          showToast("Add a title first");
+          return;
+        }
+        var when = computeWhen(state.whenKey);
+        var suffix = state.repeat ? " · Repeats" : "";
+        addReminder({
+          title: t,
+          kind: "time",
+          when: when + suffix,
+          remain: "Due in " + (state.whenKey === "later" ? "3h 0m" : "18h 0m"),
+          section: state.whenKey === "later" ? "today" : "upcoming"
+        });
+        return;
+      }
+
+      if (e.target.closest("#place-search-btn")) {
+        runSearch();
+        return;
+      }
+      var savedItem = e.target.closest("[data-saved-index]");
+      if (savedItem) {
+        var savedList = document.getElementById("saved-places")._filtered || savedPlaces;
+        selectPlace(savedList[Number(savedItem.getAttribute("data-saved-index"))], "saved");
+        return;
+      }
+      var resultItem = e.target.closest("[data-result-index]");
+      if (resultItem) {
+        var hits = document.getElementById("search-results")._filtered || state.searchHits;
+        selectPlace(hits[Number(resultItem.getAttribute("data-result-index"))], "search");
+        return;
+      }
+
+      var trig = e.target.closest("#trigger-seg .seg");
+      if (trig) {
+        state.trigger = trig.getAttribute("data-trigger");
+        syncPlaceConfig();
+        return;
+      }
+      var rad = e.target.closest("#radius-row .repeat-btn");
+      if (rad) {
+        state.radius = Number(rad.getAttribute("data-radius"));
+        syncPlaceConfig();
+        return;
+      }
+      if (e.target.closest("#perm-allow")) {
+        if (!state.fineGranted) {
+          state.fineGranted = true;
+          showToast("Precise location allowed");
+        } else if (!state.backgroundGranted) {
+          state.backgroundGranted = true;
+          showToast("Background location allowed");
+        }
+        syncPlaceConfig();
+        return;
+      }
+      if (e.target.closest("#open-maps")) {
+        if (!state.place) return;
+        var url =
+          "https://www.google.com/maps/search/?api=1&query=" +
+          encodeURIComponent(state.place.lat + "," + state.place.lng + " (" + state.place.name + ")");
+        window.open(url, "_blank", "noopener,noreferrer");
+        showToast("Opened in Maps");
+        return;
+      }
+      if (e.target.closest("#map-fs-open")) {
+        document.getElementById("map-fs").classList.add("show");
+        return;
+      }
+      if (e.target.closest("#map-fs-close")) {
+        document.getElementById("map-fs").classList.remove("show");
+        return;
+      }
+      if (e.target.closest("#save-place")) {
+        if (!state.fineGranted || !state.backgroundGranted) {
+          showToast("Allow location first");
+          return;
+        }
+        returnToManualWithPlace();
+        return;
+      }
+      if (e.target.closest("#save-place-final")) {
+        if (!state.place) return;
+        var pt = document.getElementById("manual-title").value.trim() || "Untitled";
+        var triggerLabel =
+          state.trigger === "ARRIVING" ? "Arriving" :
+          state.trigger === "LEAVING" ? "Leaving" : "Arrive or leave";
+        addReminder({
+          title: pt,
+          kind: "place",
+          when: "At " + state.place.name + " · " + triggerLabel +
+            (state.offsetMinutes > 0 ? " · +" + state.offsetMinutes + "m" : "") +
+            " · " + state.radius + "m",
+          remain: "",
+          section: "today"
+        });
+        return;
+      }
+
+      if (e.target.closest("#voice-mic")) {
+        state.listening = !state.listening;
+        if (state.listening && !document.getElementById("voice-text").value) {
+          document.getElementById("voice-text").value = "Remind me to water the plants tomorrow at 8am";
+        }
+        syncVoice();
+        return;
+      }
+      if (e.target.closest("#voice-done")) {
+        var vt = document.getElementById("voice-text").value.trim();
+        if (!vt) return;
+        // Simulated parse → land on manual sheet prefilled (mirrors voice→edit)
+        openManual(vt.replace(/^Remind me to\s+/i, "").replace(/\s+tomorrow.*$/i, ""));
+        state.whenKey = "tm-morning";
+        syncWhenUI();
+        showToast("Parsed — confirm on the sheet");
+        return;
+      }
+    });
+
+    document.getElementById("voice-text").addEventListener("input", syncVoice);
+    document.getElementById("place-query").addEventListener("input", function (e) {
+      document.getElementById("place-search-error").hidden = true;
+      renderSavedPlaces(e.target.value);
+    });
+    document.getElementById("place-query").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        runSearch();
+      }
+    });
+    document.getElementById("custom-date").addEventListener("change", syncWhenUI);
+    document.getElementById("custom-time").addEventListener("change", syncWhenUI);
+    document.getElementById("manual-title").addEventListener("input", function () {
+      document.getElementById("what-need-title").hidden = true;
+    });
+
+    // init custom defaults
+    var tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    document.getElementById("custom-date").value = tomorrow.toISOString().slice(0, 10);
+    document.getElementById("custom-time").value = "09:00";
+
+    renderHome();
+    syncWhenUI();
+    syncRepeatUI();
+    phone.classList.add("show-hint");
+    setTimeout(function () { phone.classList.remove("show-hint"); }, 3200);
+  })();
+  </script>
+</body>
+</html>

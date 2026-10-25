@@ -340,12 +340,14 @@ private fun OnboardingSuccess(onComplete: () -> Unit) {
 @Composable
 fun VoiceFlowScreen(
     onClose: () -> Unit,
+    onManualCreate: () -> Unit,
     onEditDraft: (ReminderDraft) -> Unit,
     viewModel: VoiceFlowViewModel = hiltViewModel(),
 ) {
     when (val state = viewModel.state) {
         VoiceFlowState.Listening -> VoiceListening(
             onClose = onClose,
+            onManualCreate = onManualCreate,
             onSubmit = viewModel::parse,
         )
         is VoiceFlowState.Parsing -> ParsingScreen(state.transcript)
@@ -382,6 +384,7 @@ fun VoiceFlowScreen(
 @Composable
 private fun VoiceListening(
     onClose: () -> Unit,
+    onManualCreate: () -> Unit,
     onSubmit: (String) -> Unit,
 ) {
     val context = LocalContext.current
@@ -615,6 +618,14 @@ private fun VoiceListening(
             color = TextDim,
             fontSize = 11.sp,
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        )
+        Text(
+            "Can't talk right now? Create manually",
+            color = Accent2,
+            fontSize = 12.sp,
+            modifier = Modifier
+                .clickable(onClick = onManualCreate)
+                .padding(top = 14.dp, bottom = 4.dp),
         )
         Spacer(Modifier.height(12.dp))
         error?.let { Text(it, color = Danger, fontSize = 12.sp, textAlign = TextAlign.Center) }

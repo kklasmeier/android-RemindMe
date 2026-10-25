@@ -98,6 +98,9 @@ class ReminderNotificationPublisher @Inject constructor(
         }
 
         val channel = when {
+            reminder.alertAlarm && reminder.alertFullScreen && canUseFullScreenIntent() ->
+                ReminderChannels.FULL_SCREEN_SILENT
+            reminder.alertAlarm && reminder.alertHeadsUp -> ReminderChannels.HEADS_UP_SILENT
             reminder.alertFullScreen && canUseFullScreenIntent() && reminder.alertSound -> ReminderChannels.FULL_SCREEN
             reminder.alertFullScreen && canUseFullScreenIntent() -> ReminderChannels.FULL_SCREEN_SILENT
             reminder.alertHeadsUp && reminder.alertSound -> ReminderChannels.HEADS_UP

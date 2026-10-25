@@ -59,6 +59,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
@@ -233,17 +234,22 @@ private fun LocationSearchScreen(
             }
         }
         item {
+            var searchFocused by remember { mutableStateOf(false) }
             OutlinedTextField(
                 value = query,
                 onValueChange = onQueryChange,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { searchFocused = it.isFocused },
                 placeholder = {
-                    Text(
-                        "Search a place, address, or landmark",
-                        color = TextDim,
-                        fontSize = 14.sp,
-                        fontStyle = FontStyle.Italic,
-                    )
+                    if (!searchFocused && query.isEmpty()) {
+                        Text(
+                            "Search a place, address, or landmark",
+                            color = TextDim,
+                            fontSize = 14.sp,
+                            fontStyle = FontStyle.Italic,
+                        )
+                    }
                 },
                 leadingIcon = { Icon(Icons.Default.Search, null) },
                 trailingIcon = {
@@ -275,6 +281,7 @@ private fun LocationResultsScreen(
     onClear: () -> Unit,
     onSelect: (PlaceCandidate) -> Unit,
 ) {
+    val mapResults = remember(results) { results.filterNot { it.isSaved } }
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(20.dp),
@@ -283,11 +290,11 @@ private fun LocationResultsScreen(
         item { LocationHeader("Search Results", onBack, onCancel) }
         item {
             Text("“$query”", color = TextMuted)
-            Text("${results.size} matches · confirm the correct location", color = TextDim, fontSize = 11.sp)
+            Text("${mapResults.size} matches · confirm the correct location", color = TextDim, fontSize = 11.sp)
         }
-        items(results) { candidate ->
+        items(mapResults) { candidate ->
             PlaceRow(
-                if (candidate.isSaved) "${candidate.name} · Saved" else candidate.name,
+                candidate.name,
                 buildString {
                     append(candidate.address)
                     candidate.distanceMeters?.let { append(" · ${formatDistance(it)}") }

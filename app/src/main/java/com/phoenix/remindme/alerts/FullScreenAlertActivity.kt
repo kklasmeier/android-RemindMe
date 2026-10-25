@@ -43,6 +43,7 @@ import com.phoenix.remindme.ui.theme.Glass
 import com.phoenix.remindme.ui.theme.RemindMeTheme
 import com.phoenix.remindme.ui.theme.TextDim
 import com.phoenix.remindme.ui.theme.TextMuted
+import com.phoenix.remindme.ui.theme.TextPrimary
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -77,6 +78,7 @@ class FullScreenAlertActivity : ComponentActivity() {
     }
 
     private fun perform(action: String, snoozeMinutes: Int? = null) {
+        AlarmSoundService.stop(this, reminderId)
         val actionIntent = Intent(this, ReminderActionReceiver::class.java)
             .setAction(action)
             .putExtra(EXTRA_REMINDER_ID, reminderId)
@@ -110,6 +112,7 @@ private fun FullScreenAlert(
         Text("REMINDME", color = TextDim, fontSize = 11.sp, letterSpacing = 3.sp)
         Text(
             DateTimeFormatter.ofPattern("h:mm").format(now),
+            color = TextPrimary,
             fontSize = 72.sp,
             fontWeight = FontWeight.Bold,
         )
@@ -133,6 +136,7 @@ private fun FullScreenAlert(
         Spacer(Modifier.height(8.dp))
         Text(
             title,
+            color = TextPrimary,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
@@ -147,6 +151,10 @@ private fun FullScreenAlert(
                 .fillMaxWidth()
                 .height(56.dp),
             shape = RoundedCornerShape(18.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Accent,
+                contentColor = Color.White,
+            ),
         ) {
             Icon(Icons.Default.Check, null)
             Text("  Done", fontWeight = FontWeight.Bold)
@@ -163,7 +171,10 @@ private fun FullScreenAlert(
                         .weight(1f)
                         .height(60.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Glass),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Glass,
+                        contentColor = TextPrimary,
+                    ),
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(label, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -179,6 +190,7 @@ private fun FullScreenAlert(
                 .fillMaxWidth()
                 .height(50.dp),
             shape = RoundedCornerShape(18.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
         ) {
             Text("Dismiss")
         }
